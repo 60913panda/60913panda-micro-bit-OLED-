@@ -3,243 +3,377 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PandaPanda 的 AI 日常</title>
-    
-    <!-- 引入 Google Fonts 使字體更美觀 -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
-    
-    <!-- CSS 樣式直接嵌入 HTML 中 -->
+    <title>像素畫板</title>
     <style>
-        /* --- 全域設定 --- */
+        /* 頁面基本樣式 */
         body {
-            font-family: 'Noto Sans TC', sans-serif;
-            background-color: #f0f8e8; /* 淡雅的竹綠色背景 */
-            color: #3d3d3d;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
             margin: 0;
-            line-height: 1.7;
+            background-color: #f0f4f8; /* 淡雅的背景色 */
+            color: #333;
         }
 
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
         }
 
-        /* --- 頁首 & 導覽列 --- */
-        header {
+        /* 控制按鈕區塊 */
+        #controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        #function-name-input {
+            padding: 9px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: 1px solid #bdc3c7;
+            min-width: 180px;
+        }
+
+        #reset-button { background-color: #e74c3c; }
+        #reset-button:hover { background-color: #c0392b; }
+        #transform-button { background-color: #3498db; }
+        #transform-button:hover { background-color: #2980b9; }
+
+        /* 網格容器 */
+        #grid-container {
+            --cell-size: 8px;
+            --grid-width: 128;
+            --grid-height: 64;
+            
+            display: grid;
+            grid-template-columns: repeat(var(--grid-width), var(--cell-size));
+            grid-template-rows: repeat(var(--grid-height), var(--cell-size));
+            border: 2px solid #bdc3c7;
+            background-color: #7f8c8d; /* 網格間隙的背景色 */
+            gap: 1px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+            user-select: none;
+        }
+
+        /* 網格中的單一儲存格 */
+        .grid-cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: black;
+        }
+        .grid-cell.white { background-color: white; }
+
+        /* --- 程式碼輸出 Modal --- */
+        .hidden { display: none !important; }
+
+        #code-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+        }
+
+        #code-modal.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background-color: #2d3436;
+            color: #dfe6e9;
+            padding: 25px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 650px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 20px 0;
-            border-bottom: 2px solid #dde8d4;
-        }
-
-        .logo {
-            font-size: 1.8em;
-            font-weight: 700;
-            color: #2c5e32; /* 深綠色 */
-            display: flex;
-            align-items: center;
-        }
-
-        .logo img {
-            width: 45px;
-            height: 45px;
-            margin-right: 12px;
-            border-radius: 50%; /* 從方角改為圓形 */
-        }
-
-        nav a {
-            margin-left: 25px;
-            text-decoration: none;
-            color: #3c6e42;
-            font-weight: 600;
-            font-size: 1.1em;
-            transition: color 0.3s ease;
-        }
-
-        nav a:hover {
-            color: #1a3a1d;
-        }
-
-        /* --- 內容區塊通用樣式 --- */
-        .page-section {
-            background-color: #ffffff;
-            padding: 40px;
-            margin-top: 30px;
-            border-radius: 20px; /* 增加圓角弧度 */
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-        }
-
-        .page-section h2 {
-            font-size: 2em;
-            color: #2c5e32;
-            margin-top: 0;
-            margin-bottom: 20px;
-            border-bottom: 3px solid #eef5e9;
-            padding-bottom: 10px;
-        }
-
-        /* --- 小工具區塊樣式 --- */
-        .tools-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 25px;
-            margin-top: 30px;
-        }
-
-        .tool-card {
-            background-color: #f8fbf6;
-            border: 2px solid #eef5e9;
-            border-radius: 15px;
-            padding: 25px;
-            text-align: center;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .tool-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.09);
-        }
-
-        .tool-card h3 {
-            margin-top: 0;
-            color: #2c5e32;
-        }
-
-        .tool-link {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 10px 20px;
-            background-color: #3c6e42;
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: background-color 0.3s ease;
-        }
-
-        .tool-link:hover {
-            background-color: #2c5e32;
-        }
-
-        /* --- 頁尾 --- */
-        footer {
-            text-align: center;
-            margin-top: 50px;
-            padding: 20px;
-            color: #777;
-            font-size: 0.9em;
-        }
-        
-        .social-links {
             margin-bottom: 15px;
         }
+        
+        .modal-header h2 { margin: 0; }
 
-        .social-links a {
-            color: #3c6e42;
-            text-decoration: none;
-            margin: 0 10px;
-            font-weight: 600;
-            transition: text-decoration 0.3s ease;
+        .modal-close {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #b2bec3;
+        }
+        .modal-close:hover { color: #fff; }
+
+        pre, #code-editor {
+            background-color: #222;
+            border-radius: 5px;
+            padding: 15px;
+            flex-grow: 1;
+            min-height: 250px;
+            max-height: 60vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+        }
+        
+        #code-editor {
+            border: 1px solid #555;
+            color: #dfe6e9;
+            resize: vertical;
+            width: calc(100% - 32px); /* 扣掉 padding */
+        }
+        
+        .modal-actions {
+            margin-top: 15px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
         }
 
-        .social-links a:hover {
-            text-decoration: underline;
+        .modal-actions button {
+            padding: 8px 16px;
+            font-size: 14px;
         }
 
-        /* --- 響應式設計：讓網站在手機上也能正常顯示 --- */
-        @media (max-width: 768px) {
-            header {
-                flex-direction: column;
-                gap: 15px;
-            }
+        #copy-button { background-color: #00b894; }
+        #copy-button:hover { background-color: #009e7e; }
+        #copy-button:disabled { background-color: #555; cursor: not-allowed;}
+        #edit-button { background-color: #fdcb6e; color: #333; }
+        #edit-button:hover { background-color: #eab54d; }
+        #save-button { background-color: #0984e3; }
+        #save-button:hover { background-color: #0072c3; }
 
-            nav {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 10px;
-            }
-
-            nav a {
-                margin-left: 10px;
-            }
-
-            .page-section {
-                padding: 25px;
-            }
-        }
     </style>
 </head>
 <body>
 
-    <!-- 主要容器 -->
-    <div class="container">
-
-        <!-- 頁首：網站標題和主選單 -->
-        <header>
-            <div class="logo"><img src="https://lh3.googleusercontent.com/a/ACg8ocK0Sd79qNlGdQiGKEoKfuQxqHiVCHuyH4Sw5qFkJfpy4K_J23I=s288-c-no" alt="PandaPanda Logo"> PandaPanda的AI日常</div>
-            <nav>
-                <a href="#about">關於本站</a>
-                <a href="#tools">小工具</a>
-                <a href="https://www.youtube.com/channel/UCKh0gyNAiQJRH-PkIGNkEfg">YouTube頻道</a>
-                <a href="https://www.facebook.com/profile.php?id=61578859210871&locale=zh_TW">Facebook</a>
-            </nav>
-        </header>
-
-        <!-- 主要內容區 -->
-        <main>
-            <!-- 區塊1: 網站介紹 -->
-            <section id="about" class="page-section">
-                <h2>歡迎來到 PandaPanda 的 AI 世界</h2>
-                <p>
-                    歡迎來到PandaPanda的AI日常
-                    這裡有用AI做的網站和還有各種小工具<br>
-                    還有各種AI工具...
-                </p>
-            </section>
-
-            <!-- 區塊2: 小工具 -->
-            <section id="tools" class="page-section">
-                <h2>AI 小工具區</h2>
-                <p>
-                    這裡是一些由 AI 驅動的實用小工具，希望能幫助到您！點擊下方的卡片來試用看看。
-                </p>
-                <div class="tools-grid">
-                    <!-- Tool Card 1 -->
-                    <div class="tool-card">
-                        <h3>[工具一名稱]</h3>
-                        <p>[這裡放工具的簡單描述...]</p>
-                        <a href="#" class="tool-link">立即試用</a>
-                    </div>
-                    <!-- Tool Card 2 -->
-                    <div class="tool-card">
-                        <h3>[工具二名稱]</h3>
-                        <p>[這裡放工具的簡單描述...]</p>
-                        <a href="#" class="tool-link">立即試用</a>
-                    </div>
-                    <!-- Tool Card 3 -->
-                    <div class="tool-card">
-                        <h3>[工具三名稱]</h3>
-                        <p>[這裡放工具的簡單描述...]</p>
-                        <a href="#" class="tool-link">立即試用</a>
-                    </div>
-                </div>
-            </section>
-        </main>
-
-        <!-- 頁尾 -->
-        <footer>
-            <div class="social-links">
-                <a href="https://www.youtube.com/channel/UCKh0gyNAiQJRH-PkIGNkEfg">YouTube頻道</a> | <a href="https://www.facebook.com/profile.php?id=61578859210871&locale=zh_TW">Facebook粉絲專頁</a>
-            </div>
-            <p>版權所有 &copy; 2025 PandaPanda的AI日常 All Rights Reserved. </p>
-        </footer>
-
+    <h1>像素畫板 (128x64)</h1>
+    <div id="controls">
+        <input type="text" id="function-name-input" placeholder="請輸入圖案名稱">
+        <button id="transform-button">轉換</button>
+        <button id="reset-button">清除畫布</button>
     </div>
+    <div id="grid-container"></div>
+
+    <!-- 程式碼輸出 Modal -->
+    <div id="code-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>產生的程式碼</h2>
+                <span class="modal-close" id="modal-close-button">&times;</span>
+            </div>
+            <pre><code id="code-output"></code></pre>
+            <textarea id="code-editor" class="hidden"></textarea>
+            <div class="modal-actions">
+                <button id="copy-button">複製代碼</button>
+                <button id="edit-button">編輯代碼</button>
+                <button id="save-button" class="hidden">儲存編輯</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM 元素 ---
+        const gridContainer = document.getElementById('grid-container');
+        const resetButton = document.getElementById('reset-button');
+        const transformButton = document.getElementById('transform-button');
+        const functionNameInput = document.getElementById('function-name-input');
+        
+        // Modal 相關元素
+        const codeModal = document.getElementById('code-modal');
+        const codeOutput = document.getElementById('code-output');
+        const codeEditor = document.getElementById('code-editor');
+        const modalCloseButton = document.getElementById('modal-close-button');
+        const copyButton = document.getElementById('copy-button');
+        const editButton = document.getElementById('edit-button');
+        const saveButton = document.getElementById('save-button');
+
+        // --- 常數設定 ---
+        const GRID_WIDTH = 128;
+        const GRID_HEIGHT = 64;
+
+        // --- 狀態變數 ---
+        let isMouseDown = false;
+        let cells = []; // 存放所有方格元素
+
+        /**
+         * 建立並渲染所有網格方塊
+         */
+        function createGrid() {
+            const fragment = document.createDocumentFragment();
+            for (let i = 0; i < GRID_WIDTH * GRID_HEIGHT; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('grid-cell');
+                fragment.appendChild(cell);
+            }
+            gridContainer.appendChild(fragment);
+            cells = Array.from(gridContainer.children);
+        }
+
+        /**
+         * 切換使用者互動方塊的顏色（黑/白）
+         */
+        function drawCell(interactedCell) {
+            if (interactedCell && interactedCell.classList.contains('grid-cell')) {
+                interactedCell.classList.toggle('white');
+            }
+        }
+
+        /**
+         * 產生 OLED 程式碼並顯示 Modal
+         */
+        function generateOLEDCode() {
+            const functionName = functionNameInput.value.trim().replace(/\s+/g, '_') || "_pattern";
+            
+            // 直接以 function 開頭
+            let code = `function ${functionName} () {\n`;
+
+            const whiteCells = cells.map((cell, index) => ({ cell, index }))
+                                    .filter(item => item.cell.classList.contains('white'));
+
+            if (whiteCells.length === 0) {
+                 code += `    // 沒有任何白色方格\n`;
+            } else {
+                const codeBlocks = whiteCells.map(item => {
+                    const x = item.index % GRID_WIDTH;
+                    const y = Math.floor(item.index / GRID_WIDTH);
+                    // 產生格式更緊湊的程式碼區塊
+                    return `    // 一個白色方格
+    OLED.drawLine(
+    ${x},
+    ${y},
+    ${x},
+    ${y}
+    )`;
+                });
+                // 用單一換行符連接每個區塊，避免產生空行
+                code += codeBlocks.join('\n');
+            }
+
+            code += "\n}";
+            
+            codeOutput.textContent = code;
+            codeEditor.value = code;
+            codeModal.classList.add('visible');
+        }
+
+        /**
+         * 關閉並重設 Modal 狀態
+         */
+        function closeModal() {
+            codeModal.classList.remove('visible');
+            // 確保 Modal 總是回到預覽模式
+            codeOutput.parentElement.classList.remove('hidden');
+            codeEditor.classList.add('hidden');
+            editButton.classList.remove('hidden');
+            saveButton.classList.add('hidden');
+        }
+
+        // --- 事件監聽 ---
+        gridContainer.addEventListener('mousedown', (event) => {
+            isMouseDown = true;
+            drawCell(event.target);
+            event.preventDefault();
+        });
+        gridContainer.addEventListener('mouseover', (event) => {
+            if (isMouseDown) {
+                drawCell(event.target);
+            }
+        });
+        document.addEventListener('mouseup', () => { isMouseDown = false; });
+        resetButton.addEventListener('click', () => {
+            cells.forEach(cell => cell.classList.remove('white'));
+        });
+        transformButton.addEventListener('click', generateOLEDCode);
+        
+        // --- Modal 相關事件監聽 ---
+        modalCloseButton.addEventListener('click', closeModal);
+        codeModal.addEventListener('click', (event) => {
+            if (event.target === codeModal) {
+                 closeModal();
+            }
+        });
+
+        editButton.addEventListener('click', () => {
+            codeOutput.parentElement.classList.add('hidden');
+            codeEditor.classList.remove('hidden');
+            editButton.classList.add('hidden');
+            saveButton.classList.remove('hidden');
+            codeEditor.focus();
+        });
+
+        saveButton.addEventListener('click', () => {
+            codeOutput.textContent = codeEditor.value; // 從編輯器更新預覽
+            codeOutput.parentElement.classList.remove('hidden');
+            codeEditor.classList.add('hidden');
+            editButton.classList.remove('hidden');
+            saveButton.classList.add('hidden');
+        });
+
+        copyButton.addEventListener('click', () => {
+            const textToCopy = codeEditor.value;
+            // 建立一個臨時的 textarea 來執行複製命令，以確保在所有環境下的相容性
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = textToCopy;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            
+            try {
+                document.execCommand('copy');
+                const originalText = copyButton.textContent;
+                copyButton.textContent = '已複製！';
+                copyButton.disabled = true;
+                setTimeout(() => {
+                    copyButton.textContent = originalText;
+                    copyButton.disabled = false;
+                }, 2000);
+            } catch (err) {
+                console.error('無法複製代碼: ', err);
+                // 可以加入一個錯誤提示給使用者
+            }
+            
+            document.body.removeChild(tempTextArea);
+        });
+
+        // --- 程式初始化 ---
+        createGrid();
+    </script>
+
 </body>
 </html>
+
 
