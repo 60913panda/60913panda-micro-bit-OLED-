@@ -259,8 +259,8 @@
         function generateOLEDCode() {
             const functionName = functionNameInput.value.trim().replace(/\s+/g, '_') || "_pattern";
             
-            // 直接以 function 開頭
-            let code = `function ${functionName} () {\n`;
+            // 更新函式簽名以包含 X 和 Y 參數
+            let code = `function ${functionName} (X: number, Y: number) {\n`;
 
             const whiteCells = cells.map((cell, index) => ({ cell, index }))
                                     .filter(item => item.cell.classList.contains('white'));
@@ -268,19 +268,34 @@
             if (whiteCells.length === 0) {
                  code += `    // 沒有任何白色方格\n`;
             } else {
+                // 找到圖案最左上角的座標 (minX, minY) 作為相對原點
+                let minX = GRID_WIDTH;
+                let minY = GRID_HEIGHT;
+
+                whiteCells.forEach(item => {
+                    const x = item.index % GRID_WIDTH;
+                    const y = Math.floor(item.index / GRID_WIDTH);
+                    if (x < minX) minX = x;
+                    if (y < minY) minY = y;
+                });
+                
                 const codeBlocks = whiteCells.map(item => {
                     const x = item.index % GRID_WIDTH;
                     const y = Math.floor(item.index / GRID_WIDTH);
-                    // 產生格式更緊湊的程式碼區塊
+                    
+                    // 計算相對於左上角的座標
+                    const relX = x - minX;
+                    const relY = y - minY;
+
+                    // 產生帶有 X, Y 偏移量的程式碼
                     return `    // 一個白色方格
     OLED.drawLine(
-    ${x},
-    ${y},
-    ${x},
-    ${y}
+    ${relX} + X,
+    ${relY} + Y,
+    ${relX} + X,
+    ${relY} + Y
     )`;
                 });
-                // 用單一換行符連接每個區塊，避免產生空行
                 code += codeBlocks.join('\n');
             }
 
@@ -290,6 +305,7 @@
             codeEditor.value = code;
             codeModal.classList.add('visible');
         }
+
 
         /**
          * 關閉並重設 Modal 狀態
@@ -375,5 +391,4 @@
 
 </body>
 </html>
-
 
