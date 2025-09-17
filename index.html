@@ -27,11 +27,30 @@
         /* 控制按鈕區塊 */
         #controls {
             display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .control-row {
+            display: flex;
             flex-wrap: wrap;
             justify-content: center;
             align-items: center;
             gap: 10px;
-            margin-bottom: 20px;
+        }
+        
+        #transform-options {
+            background-color: #ecf0f1;
+            padding: 5px 15px;
+            border-radius: 12px;
+            border: 1px solid #bdc3c7;
+        }
+        
+        #transform-options label {
+            cursor: pointer;
+            padding: 5px;
         }
 
         button {
@@ -57,6 +76,9 @@
         #reset-button:hover { background-color: #c0392b; }
         #transform-button { background-color: #3498db; }
         #transform-button:hover { background-color: #2980b9; }
+        #load-from-code-button { background-color: #9b59b6; }
+        #load-from-code-button:hover { background-color: #8e44ad; }
+
 
         /* 網格容器 */
         #grid-container {
@@ -126,7 +148,10 @@
             margin-bottom: 15px;
         }
         
-        .modal-header h2 { margin: 0; }
+        .modal-header h2 { 
+            margin: 0; 
+            transition: color 0.3s ease;
+        }
 
         .modal-close {
             font-size: 28px;
@@ -160,6 +185,7 @@
         .modal-actions {
             margin-top: 15px;
             display: flex;
+            flex-wrap: wrap;
             justify-content: flex-end;
             gap: 10px;
         }
@@ -176,6 +202,10 @@
         #edit-button:hover { background-color: #eab54d; }
         #save-button { background-color: #0984e3; }
         #save-button:hover { background-color: #0072c3; }
+        #load-button { background-color: #6c5ce7; }
+        #load-button:hover { background-color: #5849d4; }
+        #format-button { background-color: #e17055; }
+        #format-button:hover { background-color: #d35400; }
 
     </style>
 </head>
@@ -183,9 +213,18 @@
 
     <h1>像素畫板 (128x64)</h1>
     <div id="controls">
-        <input type="text" id="function-name-input" placeholder="請輸入圖案名稱">
-        <button id="transform-button">轉換</button>
-        <button id="reset-button">清除畫布</button>
+        <div class="control-row">
+            <input type="text" id="function-name-input" placeholder="請輸入圖案名稱">
+            <button id="transform-button">轉換</button>
+            <button id="load-from-code-button">載入</button>
+            <button id="reset-button">清除畫布</button>
+        </div>
+        <div id="transform-options" class="control-row">
+            <span>轉換模式：</span>
+            <label><input type="radio" name="transform-mode" value="vars" checked> 有變數</label>
+            <label><input type="radio" name="transform-mode" value="no-vars"> 無變數</label>
+            <label><input type="radio" name="transform-mode" value="simplified"> 簡化代碼</label>
+        </div>
     </div>
     <div id="grid-container"></div>
 
@@ -193,15 +232,17 @@
     <div id="code-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>產生的程式碼</h2>
+                <h2 id="modal-title">程式碼編輯器</h2>
                 <span class="modal-close" id="modal-close-button">&times;</span>
             </div>
             <pre><code id="code-output"></code></pre>
             <textarea id="code-editor" class="hidden"></textarea>
             <div class="modal-actions">
+                <button id="format-button" class="hidden">修正格式</button>
                 <button id="copy-button">複製代碼</button>
                 <button id="edit-button">編輯代碼</button>
                 <button id="save-button" class="hidden">儲存編輯</button>
+                <button id="load-button" class="hidden">載入圖案</button>
             </div>
         </div>
     </div>
@@ -211,16 +252,20 @@
         const gridContainer = document.getElementById('grid-container');
         const resetButton = document.getElementById('reset-button');
         const transformButton = document.getElementById('transform-button');
+        const loadFromCodeButton = document.getElementById('load-from-code-button');
         const functionNameInput = document.getElementById('function-name-input');
         
         // Modal 相關元素
         const codeModal = document.getElementById('code-modal');
+        const modalTitle = document.getElementById('modal-title');
         const codeOutput = document.getElementById('code-output');
         const codeEditor = document.getElementById('code-editor');
         const modalCloseButton = document.getElementById('modal-close-button');
         const copyButton = document.getElementById('copy-button');
         const editButton = document.getElementById('edit-button');
         const saveButton = document.getElementById('save-button');
+        const loadButton = document.getElementById('load-button');
+        const formatButton = document.getElementById('format-button');
 
         // --- 常數設定 ---
         const GRID_WIDTH = 128;
@@ -252,58 +297,138 @@
                 interactedCell.classList.toggle('white');
             }
         }
-
+        
         /**
-         * 產生 OLED 程式碼並顯示 Modal
+         * 核心：產生 OLED 程式碼並顯示 Modal
          */
         function generateOLEDCode() {
             const functionName = functionNameInput.value.trim().replace(/\s+/g, '_') || "_pattern";
-            
-            // 更新函式簽名以包含 X 和 Y 參數
-            let code = `function ${functionName} (X: number, Y: number) {\n`;
-
+            const mode = document.querySelector('input[name="transform-mode"]:checked').value;
             const whiteCells = cells.map((cell, index) => ({ cell, index }))
                                     .filter(item => item.cell.classList.contains('white'));
+            
+            let code = '';
 
             if (whiteCells.length === 0) {
-                 code += `    // 沒有任何白色方格\n`;
-            } else {
-                // 找到圖案最左上角的座標 (minX, minY) 作為相對原點
-                let minX = GRID_WIDTH;
-                let minY = GRID_HEIGHT;
-
-                whiteCells.forEach(item => {
-                    const x = item.index % GRID_WIDTH;
-                    const y = Math.floor(item.index / GRID_WIDTH);
-                    if (x < minX) minX = x;
-                    if (y < minY) minY = y;
-                });
-                
-                const codeBlocks = whiteCells.map(item => {
-                    const x = item.index % GRID_WIDTH;
-                    const y = Math.floor(item.index / GRID_WIDTH);
-                    
-                    // 計算相對於左上角的座標
-                    const relX = x - minX;
-                    const relY = y - minY;
-
-                    // 產生帶有 X, Y 偏移量的程式碼
-                    return `    // 一個白色方格
-    OLED.drawLine(
-    ${relX} + X,
-    ${relY} + Y,
-    ${relX} + X,
-    ${relY} + Y
-    )`;
-                });
-                code += codeBlocks.join('\n');
+                 code = `function ${functionName} () {\n    // 沒有任何白色方格\n}`;
+                 openModalWithCode(code);
+                 return;
             }
 
-            code += "\n}";
+            switch(mode) {
+                case 'vars':
+                    code = generateCodeWithVars(whiteCells, functionName);
+                    break;
+                case 'no-vars':
+                    code = generateCodeWithoutVars(whiteCells, functionName);
+                    break;
+                case 'simplified':
+                    code = generateSimplifiedCode(whiteCells, functionName);
+                    break;
+            }
             
+            openModalWithCode(code);
+        }
+        
+        function openModalWithCode(code) {
+            modalTitle.textContent = '程式碼編輯器';
+            modalTitle.style.color = '';
             codeOutput.textContent = code;
             codeEditor.value = code;
             codeModal.classList.add('visible');
+            codeOutput.parentElement.classList.remove('hidden');
+            codeEditor.classList.add('hidden');
+            editButton.classList.remove('hidden');
+            saveButton.classList.add('hidden');
+            loadButton.classList.add('hidden');
+            formatButton.classList.add('hidden');
+        }
+
+        // --- 程式碼產生輔助函式 ---
+
+        function generateCodeWithVars(whiteCells, functionName) {
+            let code = `function ${functionName} (X: number, Y: number) {\n`;
+            let minX = GRID_WIDTH, minY = GRID_HEIGHT;
+            whiteCells.forEach(item => {
+                const x = item.index % GRID_WIDTH;
+                const y = Math.floor(item.index / GRID_WIDTH);
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+            });
+            const codeBlocks = whiteCells.map(item => {
+                const x = item.index % GRID_WIDTH;
+                const y = Math.floor(item.index / GRID_WIDTH);
+                return `    // 一個白色方格
+    OLED.drawLine(
+    ${x - minX} + X,
+    ${y - minY} + Y,
+    ${x - minX} + X,
+    ${y - minY} + Y
+    )`;
+            });
+            return code + codeBlocks.join('\n') + '\n}';
+        }
+
+        function generateCodeWithoutVars(whiteCells, functionName) {
+            let code = `function ${functionName} () {\n`;
+            const codeBlocks = whiteCells.map(item => {
+                const x = item.index % GRID_WIDTH;
+                const y = Math.floor(item.index / GRID_WIDTH);
+                return `    // 一個白色方格
+    OLED.drawLine(
+    ${x},
+    ${y},
+    ${x},
+    ${y}
+    )`;
+            });
+            return code + codeBlocks.join('\n') + '\n}';
+        }
+        
+        function generateSimplifiedCode(whiteCells, functionName) {
+            let code = `function ${functionName} () {\n`;
+            const pixels = new Set();
+            whiteCells.forEach(item => {
+                const x = item.index % GRID_WIDTH;
+                const y = Math.floor(item.index / GRID_WIDTH);
+                pixels.add(`${x},${y}`);
+            });
+            
+            const visited = new Set();
+            const lines = [];
+
+            whiteCells.sort((a,b) => a.index - b.index).forEach(item => {
+                const startX = item.index % GRID_WIDTH;
+                const startY = Math.floor(item.index / GRID_WIDTH);
+                const coord = `${startX},${startY}`;
+
+                if (visited.has(coord)) return;
+
+                let hx = startX;
+                while(pixels.has(`${hx + 1},${startY}`)) hx++;
+                
+                let vy = startY;
+                while(pixels.has(`${startX},${vy + 1}`)) vy++;
+
+                if ((hx - startX) >= (vy - startY)) {
+                    lines.push({ x1: startX, y1: startY, x2: hx, y2: startY });
+                    for (let i = startX; i <= hx; i++) visited.add(`${i},${startY}`);
+                } else {
+                    lines.push({ x1: startX, y1: startY, x2: startX, y2: vy });
+                    for (let i = startY; i <= vy; i++) visited.add(`${startX},${i}`);
+                }
+            });
+
+            const codeBlocks = lines.map(line => {
+                return `    // 一條線/一個方格
+    OLED.drawLine(
+    ${line.x1},
+    ${line.y1},
+    ${line.x2},
+    ${line.y2}
+    )`;
+            });
+            return code + codeBlocks.join('\n') + '\n}';
         }
 
 
@@ -312,11 +437,6 @@
          */
         function closeModal() {
             codeModal.classList.remove('visible');
-            // 確保 Modal 總是回到預覽模式
-            codeOutput.parentElement.classList.remove('hidden');
-            codeEditor.classList.add('hidden');
-            editButton.classList.remove('hidden');
-            saveButton.classList.add('hidden');
         }
 
         // --- 事件監聽 ---
@@ -336,6 +456,11 @@
         });
         transformButton.addEventListener('click', generateOLEDCode);
         
+        loadFromCodeButton.addEventListener('click', () => {
+            openModalWithCode('');
+            editButton.click(); // 直接進入編輯模式
+        });
+        
         // --- Modal 相關事件監聽 ---
         modalCloseButton.addEventListener('click', closeModal);
         codeModal.addEventListener('click', (event) => {
@@ -349,20 +474,23 @@
             codeEditor.classList.remove('hidden');
             editButton.classList.add('hidden');
             saveButton.classList.remove('hidden');
+            loadButton.classList.remove('hidden');
+            formatButton.classList.remove('hidden');
             codeEditor.focus();
         });
 
         saveButton.addEventListener('click', () => {
-            codeOutput.textContent = codeEditor.value; // 從編輯器更新預覽
+            codeOutput.textContent = codeEditor.value;
             codeOutput.parentElement.classList.remove('hidden');
             codeEditor.classList.add('hidden');
             editButton.classList.remove('hidden');
             saveButton.classList.add('hidden');
+            loadButton.classList.add('hidden');
+            formatButton.classList.add('hidden');
         });
 
         copyButton.addEventListener('click', () => {
-            const textToCopy = codeEditor.value;
-            // 建立一個臨時的 textarea 來執行複製命令，以確保在所有環境下的相容性
+            const textToCopy = editButton.classList.contains('hidden') ? codeEditor.value : codeOutput.textContent;
             const tempTextArea = document.createElement('textarea');
             tempTextArea.value = textToCopy;
             document.body.appendChild(tempTextArea);
@@ -379,10 +507,128 @@
                 }, 2000);
             } catch (err) {
                 console.error('無法複製代碼: ', err);
-                // 可以加入一個錯誤提示給使用者
             }
             
             document.body.removeChild(tempTextArea);
+        });
+        
+        /**
+         * 在畫布上繪製一條線 (Bresenham's algorithm)
+         */
+        function drawLineOnGrid(x1, y1, x2, y2) {
+            let dx = Math.abs(x2 - x1), sx = x1 < x2 ? 1 : -1;
+            let dy = -Math.abs(y2 - y1), sy = y1 < y2 ? 1 : -1;
+            let err = dx + dy, e2;
+
+            while (true) {
+                if (x1 >= 0 && x1 < GRID_WIDTH && y1 >= 0 && y1 < GRID_HEIGHT) {
+                    cells[y1 * GRID_WIDTH + x1].classList.add('white');
+                }
+                if (x1 === x2 && y1 === y2) break;
+                e2 = 2 * err;
+                if (e2 >= dy) { err += dy; x1 += sx; }
+                if (e2 <= dx) { err += dx; y1 += sy; }
+            }
+        }
+
+        loadButton.addEventListener('click', () => {
+            const code = codeEditor.value;
+            cells.forEach(cell => cell.classList.remove('white'));
+            
+            const drawCommands = [];
+            const OLED_mock = {
+                drawLine: function(x1, y1, x2, y2) {
+                    if ([x1, y1, x2, y2].every(v => typeof v === 'number' && isFinite(v))) {
+                        drawCommands.push({ x1, y1, x2, y2 });
+                    }
+                }
+            };
+
+            try {
+                const functionNameMatch = code.match(/function\s*([^\s(]+)/);
+                if (functionNameMatch && functionNameMatch[1]) {
+                    const functionName = functionNameMatch[1];
+                    const executor = new Function('OLED', code + `\nif (typeof ${functionName} === 'function') { ${functionName}(); }`);
+                    executor(OLED_mock);
+                } else {
+                    // 如果沒有 function，退回簡易解析模式
+                    const regex = /OLED\.drawLine\s*\(([\s\S]*?)\)/g;
+                    let match;
+                    while ((match = regex.exec(code)) !== null) {
+                        const args = match[1];
+                        const argParts = args.split(',');
+                        if (argParts.length >= 2) {
+                            const points = argParts.map(part => {
+                                const numMatch = part.match(/-?\d+/);
+                                return numMatch ? parseInt(numMatch[0], 10) : 0;
+                            });
+                            if (points.length >= 4) {
+                                OLED_mock.drawLine(points[0], points[1], points[2], points[3]);
+                            } else {
+                                OLED_mock.drawLine(points[0], points[1], points[0], points[1]);
+                            }
+                        }
+                    }
+                }
+                
+                if (drawCommands.length === 0 && code.trim().length > 0) {
+                     console.warn("載入完成，但未找到任何有效的繪圖指令。");
+                }
+                
+                drawCommands.forEach(cmd => {
+                    drawLineOnGrid(cmd.x1, cmd.y1, cmd.x2, cmd.y2);
+                });
+
+            } catch (e) {
+                console.error("執行載入的程式碼時發生錯誤:", e);
+                modalTitle.textContent = '程式碼執行錯誤！';
+                modalTitle.style.color = '#e74c3c';
+                setTimeout(() => { 
+                    modalTitle.textContent = '程式碼編輯器';
+                    modalTitle.style.color = '';
+                }, 3000);
+                return; // 發生錯誤時，停留在 Modal
+            }
+            
+            closeModal();
+        });
+
+        formatButton.addEventListener('click', () => {
+            const code = codeEditor.value;
+            const nameMatch = code.match(/function\s*([^\s(]+)/);
+            const functionName = nameMatch ? nameMatch[1] : '_pattern';
+
+            const paramsMatch = code.match(/function[^{]+\(([^)]*)\)/);
+            const params = paramsMatch ? paramsMatch[1].trim() : '';
+
+            const drawCalls = code.match(/OLED\.drawLine\s*\(([\s\S]*?)\)/g) || [];
+
+            let formattedCode = `function ${functionName} (${params}) {\n`;
+            if(drawCalls.length > 0) {
+                 const formattedCalls = drawCalls.map(call => {
+                    const argContent = call.substring(call.indexOf('(') + 1, call.lastIndexOf(')'));
+                    const argParts = argContent.split(',');
+                    const points = argParts.map(part => {
+                         const numMatch = part.match(/-?\d+/);
+                         return numMatch ? parseInt(numMatch[0], 10) : 0;
+                    });
+
+                    const comment = (points.length >= 4 && (points[0] !== points[2] || points[1] !== points[3])) ? '一條線' : '一個白色方格';
+                    return `    // ${comment}
+    OLED.drawLine(
+    ${points[0] || 0},
+    ${points[1] || 0},
+    ${points[2] || points[0] || 0},
+    ${points[3] || points[1] || 0}
+    )`;
+                 }).filter(Boolean);
+                formattedCode += formattedCalls.join('\n');
+            } else {
+                 formattedCode += `    // 沒有任何繪圖指令\n`;
+            }
+
+            formattedCode += '\n}';
+            codeEditor.value = formattedCode;
         });
 
         // --- 程式初始化 ---
