@@ -99,6 +99,8 @@
         #transform-button:hover { background-color: #2980b9; }
         #load-from-code-button { background-color: #9b59b6; }
         #load-from-code-button:hover { background-color: #8e44ad; }
+        #invert-colors-button { background-color: #34495e; }
+        #invert-colors-button:hover { background-color: #2c3e50; }
 
 
         /* 網格容器 */
@@ -238,6 +240,7 @@
             <input type="text" id="function-name-input" placeholder="請輸入圖案名稱">
             <button id="transform-button">轉換</button>
             <button id="load-from-code-button">載入</button>
+            <button id="invert-colors-button">黑白轉換</button>
             <button id="reset-button">清除畫布</button>
         </div>
         <div class="control-row">
@@ -288,6 +291,7 @@
         const resetButton = document.getElementById('reset-button');
         const transformButton = document.getElementById('transform-button');
         const loadFromCodeButton = document.getElementById('load-from-code-button');
+        const invertColorsButton = document.getElementById('invert-colors-button');
         const functionNameInput = document.getElementById('function-name-input');
         
         // Modal 相關元素
@@ -562,9 +566,15 @@
             }
         });
         document.addEventListener('mouseup', () => { isMouseDown = false; });
+        
         resetButton.addEventListener('click', () => {
             cells.forEach(cell => cell.classList.remove('white'));
         });
+
+        invertColorsButton.addEventListener('click', () => {
+            cells.forEach(cell => cell.classList.toggle('white'));
+        });
+
         transformButton.addEventListener('click', generateOLEDCode);
         
         loadFromCodeButton.addEventListener('click', () => {
