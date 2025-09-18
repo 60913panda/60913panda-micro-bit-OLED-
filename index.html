@@ -41,9 +41,9 @@
             gap: 10px;
         }
         
-        #transform-options {
+        #transform-options, #movement-controls, #zoom-controls {
             background-color: #ecf0f1;
-            padding: 5px 15px;
+            padding: 10px 15px;
             border-radius: 12px;
             border: 1px solid #bdc3c7;
         }
@@ -64,6 +64,27 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         
+        .action-button {
+            width: 50px;
+            height: 40px;
+            font-size: 20px;
+            padding: 0;
+            line-height: 40px;
+        }
+        .move-button {
+            background-color: #27ae60;
+        }
+        .move-button:hover {
+            background-color: #229954;
+        }
+        .zoom-button {
+             background-color: #f39c12;
+        }
+        .zoom-button:hover {
+            background-color: #e67e22;
+        }
+
+
         #function-name-input {
             padding: 9px;
             font-size: 16px;
@@ -219,11 +240,25 @@
             <button id="load-from-code-button">載入</button>
             <button id="reset-button">清除畫布</button>
         </div>
-        <div id="transform-options" class="control-row">
-            <span>轉換模式：</span>
-            <label><input type="radio" name="transform-mode" value="vars" checked> 有變數</label>
-            <label><input type="radio" name="transform-mode" value="no-vars"> 無變數</label>
-            <label><input type="radio" name="transform-mode" value="simplified"> 簡化代碼</label>
+        <div class="control-row">
+            <div id="transform-options">
+                <span>轉換模式：</span>
+                <label><input type="radio" name="transform-mode" value="vars" checked> 有變數</label>
+                <label><input type="radio" name="transform-mode" value="no-vars"> 無變數</label>
+                <label><input type="radio" name="transform-mode" value="simplified"> 簡化代碼</label>
+            </div>
+            <div id="movement-controls">
+                 <span>移動圖形：</span>
+                <button id="move-up-button" class="action-button move-button">↑</button>
+                <button id="move-down-button" class="action-button move-button">↓</button>
+                <button id="move-left-button" class="action-button move-button">←</button>
+                <button id="move-right-button" class="action-button move-button">→</button>
+            </div>
+            <div id="zoom-controls">
+                <span>縮放圖形：</span>
+                <button id="zoom-in-button" class="action-button zoom-button">+</button>
+                <button id="zoom-out-button" class="action-button zoom-button">-</button>
+            </div>
         </div>
     </div>
     <div id="grid-container"></div>
@@ -266,6 +301,14 @@
         const saveButton = document.getElementById('save-button');
         const loadButton = document.getElementById('load-button');
         const formatButton = document.getElementById('format-button');
+
+        // Movement & Zoom Buttons
+        const moveUpButton = document.getElementById('move-up-button');
+        const moveDownButton = document.getElementById('move-down-button');
+        const moveLeftButton = document.getElementById('move-left-button');
+        const moveRightButton = document.getElementById('move-right-button');
+        const zoomInButton = document.getElementById('zoom-in-button');
+        const zoomOutButton = document.getElementById('zoom-out-button');
 
         // --- 常數設定 ---
         const GRID_WIDTH = 128;
@@ -439,6 +482,74 @@
             codeModal.classList.remove('visible');
         }
 
+        /**
+         * 移動圖案
+         */
+        function movePattern(dx, dy) {
+            const currentState = cells.map(cell => cell.classList.contains('white'));
+            cells.forEach(cell => cell.classList.remove('white'));
+            
+            for (let i = 0; i < currentState.length; i++) {
+                if (currentState[i]) {
+                    const x = i % GRID_WIDTH;
+                    const y = Math.floor(i / GRID_WIDTH);
+                    
+                    const newX = x + dx;
+                    const newY = y + dy;
+                    
+                    if (newX >= 0 && newX < GRID_WIDTH && newY >= 0 && newY < GRID_HEIGHT) {
+                        const newIndex = newY * GRID_WIDTH + newX;
+                        cells[newIndex].classList.add('white');
+                    }
+                }
+            }
+        }
+        
+        /**
+         * 縮放圖案
+         */
+        function scalePattern(scaleFactor) {
+            const whiteCellCoords = [];
+            cells.forEach((cell, index) => {
+                if (cell.classList.contains('white')) {
+                    whiteCellCoords.push({
+                        x: index % GRID_WIDTH,
+                        y: Math.floor(index / GRID_WIDTH)
+                    });
+                }
+            });
+
+            if (whiteCellCoords.length === 0) return;
+
+            // 1. 計算圖案中心
+            const sum = whiteCellCoords.reduce((acc, pos) => ({ x: acc.x + pos.x, y: acc.y + pos.y }), { x: 0, y: 0 });
+            const centerX = sum.x / whiteCellCoords.length;
+            const centerY = sum.y / whiteCellCoords.length;
+
+            // 2. 計算新位置並用 Set 儲存避免重複
+            const newWhiteIndices = new Set();
+            whiteCellCoords.forEach(pos => {
+                const dx = pos.x - centerX;
+                const dy = pos.y - centerY;
+
+                const newX = Math.round(centerX + dx * scaleFactor);
+                const newY = Math.round(centerY + dy * scaleFactor);
+                
+                // 3. 檢查邊界
+                if (newX >= 0 && newX < GRID_WIDTH && newY >= 0 && newY < GRID_HEIGHT) {
+                    const newIndex = newY * GRID_WIDTH + newX;
+                    newWhiteIndices.add(newIndex);
+                }
+            });
+
+            // 4. 重繪圖案
+            cells.forEach(cell => cell.classList.remove('white'));
+            newWhiteIndices.forEach(index => {
+                cells[index].classList.add('white');
+            });
+        }
+
+
         // --- 事件監聽 ---
         gridContainer.addEventListener('mousedown', (event) => {
             isMouseDown = true;
@@ -460,6 +571,16 @@
             openModalWithCode('');
             editButton.click(); // 直接進入編輯模式
         });
+
+        // Movement listeners
+        moveRightButton.addEventListener('click', () => movePattern(1, 0));
+        moveLeftButton.addEventListener('click', () => movePattern(-1, 0));
+        moveDownButton.addEventListener('click', () => movePattern(0, 1));
+        moveUpButton.addEventListener('click', () => movePattern(0, -1));
+
+        // Zoom listeners
+        zoomInButton.addEventListener('click', () => scalePattern(1.1));
+        zoomOutButton.addEventListener('click', () => scalePattern(0.9));
         
         // --- Modal 相關事件監聽 ---
         modalCloseButton.addEventListener('click', closeModal);
@@ -522,7 +643,7 @@
 
             while (true) {
                 if (x1 >= 0 && x1 < GRID_WIDTH && y1 >= 0 && y1 < GRID_HEIGHT) {
-                    cells[y1 * GRID_WIDTH + x1].classList.add('white');
+                    cells[Math.round(y1) * GRID_WIDTH + Math.round(x1)].classList.add('white');
                 }
                 if (x1 === x2 && y1 === y2) break;
                 e2 = 2 * err;
@@ -545,16 +666,29 @@
             };
 
             try {
-                const functionNameMatch = code.match(/function\s*([^\s(]+)/);
+                // 移除 TypeScript 類型註解使其成為有效的 JavaScript
+                const sanitizedCode = code.replace(/:[^,)]+/g, '');
+
+                const functionNameMatch = sanitizedCode.match(/function\s*([^\s(]+)/);
+                const paramsMatch = sanitizedCode.match(/function[^{]+\(([^)]*)\)/); // 檢查參數
+
                 if (functionNameMatch && functionNameMatch[1]) {
                     const functionName = functionNameMatch[1];
-                    const executor = new Function('OLED', code + `\nif (typeof ${functionName} === 'function') { ${functionName}(); }`);
+                    let functionCall = `${functionName}()`; // 預設呼叫
+                    
+                    // 如果函式定義中有參數，就用 (0, 0) 去呼叫
+                    if (paramsMatch && paramsMatch[1] && paramsMatch[1].trim() !== '') {
+                        functionCall = `${functionName}(0, 0)`;
+                    }
+
+                    const executor = new Function('OLED', sanitizedCode + `\nif (typeof ${functionName} === 'function') { ${functionCall}; }`);
                     executor(OLED_mock);
+
                 } else {
                     // 如果沒有 function，退回簡易解析模式
                     const regex = /OLED\.drawLine\s*\(([\s\S]*?)\)/g;
                     let match;
-                    while ((match = regex.exec(code)) !== null) {
+                    while ((match = regex.exec(sanitizedCode)) !== null) {
                         const args = match[1];
                         const argParts = args.split(',');
                         if (argParts.length >= 2) {
@@ -576,7 +710,7 @@
                 }
                 
                 drawCommands.forEach(cmd => {
-                    drawLineOnGrid(cmd.x1, cmd.y1, cmd.x2, cmd.y2);
+                    drawLineOnGrid(Math.round(cmd.x1), Math.round(cmd.y1), Math.round(cmd.x2), Math.round(cmd.y2));
                 });
 
             } catch (e) {
@@ -599,7 +733,10 @@
             const functionName = nameMatch ? nameMatch[1] : '_pattern';
 
             const paramsMatch = code.match(/function[^{]+\(([^)]*)\)/);
-            const params = paramsMatch ? paramsMatch[1].trim() : '';
+            let params = paramsMatch ? paramsMatch[1].trim() : '';
+            // 移除參數中的類型註解
+            params = params.replace(/:[^,)]+/g, '').replace(/\s+/g, ' ').trim();
+
 
             const drawCalls = code.match(/OLED\.drawLine\s*\(([\s\S]*?)\)/g) || [];
 
