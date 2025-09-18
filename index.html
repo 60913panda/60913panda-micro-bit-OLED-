@@ -48,7 +48,7 @@
             border: 1px solid #bdc3c7;
         }
         
-        #transform-options label {
+        #transform-options label, #movement-controls label {
             cursor: pointer;
             padding: 5px;
         }
@@ -256,6 +256,10 @@
                 <button id="move-down-button" class="action-button move-button">↓</button>
                 <button id="move-left-button" class="action-button move-button">←</button>
                 <button id="move-right-button" class="action-button move-button">→</button>
+                <span style="border-left: 1px solid #bdc3c7; margin: 0 5px;"></span>
+                <span>背景:</span>
+                <label><input type="radio" name="move-bg" value="black" checked> 黑</label>
+                <label><input type="radio" name="move-bg" value="white"> 白</label>
             </div>
             <div id="zoom-controls">
                 <span>縮放圖形：</span>
@@ -491,22 +495,26 @@
          */
         function movePattern(dx, dy) {
             const currentState = cells.map(cell => cell.classList.contains('white'));
-            cells.forEach(cell => cell.classList.remove('white'));
-            
-            for (let i = 0; i < currentState.length; i++) {
-                if (currentState[i]) {
-                    const x = i % GRID_WIDTH;
-                    const y = Math.floor(i / GRID_WIDTH);
-                    
-                    const newX = x + dx;
-                    const newY = y + dy;
-                    
-                    if (newX >= 0 && newX < GRID_WIDTH && newY >= 0 && newY < GRID_HEIGHT) {
-                        const newIndex = newY * GRID_WIDTH + newX;
-                        cells[newIndex].classList.add('white');
+            const bgColorIsWhite = document.querySelector('input[name="move-bg"][value="white"]').checked;
+            const newState = [];
+
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    const sourceX = x - dx;
+                    const sourceY = y - dy;
+
+                    if (sourceX >= 0 && sourceX < GRID_WIDTH && sourceY >= 0 && sourceY < GRID_HEIGHT) {
+                        const sourceIndex = sourceY * GRID_WIDTH + sourceX;
+                        newState.push(currentState[sourceIndex]);
+                    } else {
+                        newState.push(bgColorIsWhite);
                     }
                 }
             }
+
+            newState.forEach((isWhite, index) => {
+                cells[index].classList.toggle('white', isWhite);
+            });
         }
         
         /**
