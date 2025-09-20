@@ -14,6 +14,8 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
             background-color: #f0f4f8; /* 淡雅的背景色 */
             color: #333;
         }
@@ -126,6 +128,32 @@
             background-color: black;
         }
         .grid-cell.white { background-color: white; }
+        
+        #live-code-display {
+            width: 100%;
+            max-width: 1030px; /* Corresponds to grid width */
+            margin-top: 20px;
+        }
+
+        #live-code-display h3 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        #live-code-output {
+            background-color: #2d3436;
+            color: #dfe6e9;
+            padding: 15px;
+            border-radius: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            word-break: break-all; /* 修正文字重疊問題 */
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+        }
+
 
         /* --- 程式碼輸出 Modal --- */
         .hidden { display: none !important; }
@@ -194,6 +222,7 @@
             overflow-y: auto;
             white-space: pre-wrap;
             word-wrap: break-word;
+            word-break: break-all; /* 修正文字重疊問題 */
             font-family: 'Courier New', Courier, monospace;
             font-size: 14px;
         }
@@ -269,6 +298,11 @@
         </div>
     </div>
     <div id="grid-container"></div>
+    
+    <div id="live-code-display">
+        <h3>即時預覽程式碼</h3>
+        <pre><code id="live-code-output"></code></pre>
+    </div>
 
     <!-- 程式碼輸出 Modal -->
     <div id="code-modal">
@@ -297,6 +331,7 @@
         const loadFromCodeButton = document.getElementById('load-from-code-button');
         const invertColorsButton = document.getElementById('invert-colors-button');
         const functionNameInput = document.getElementById('function-name-input');
+        const liveCodeOutput = document.getElementById('live-code-output');
         
         // Modal 相關元素
         const codeModal = document.getElementById('code-modal');
@@ -339,20 +374,36 @@
             gridContainer.appendChild(fragment);
             cells = Array.from(gridContainer.children);
         }
-
+        
         /**
-         * 切換使用者互動方塊的顏色（黑/白）
+         * 處理滑鼠繪圖的核心邏輯
          */
-        function drawCell(interactedCell) {
-            if (interactedCell && interactedCell.classList.contains('grid-cell')) {
-                interactedCell.classList.toggle('white');
+        function drawOnGrid(event) {
+            const targetCell = event.target;
+            if (!targetCell || !targetCell.classList.contains('grid-cell')) return;
+
+            let changed = false;
+            // `event.buttons`: 1 for left, 2 for right
+            if (event.buttons === 1) { // Left mouse button
+                if (!targetCell.classList.contains('white')) {
+                    targetCell.classList.add('white');
+                    changed = true;
+                }
+            } else if (event.buttons === 2) { // Right mouse button
+                if (targetCell.classList.contains('white')) {
+                    targetCell.classList.remove('white');
+                    changed = true;
+                }
+            }
+            if (changed) {
+                updateLiveCode();
             }
         }
         
         /**
-         * 核心：產生 OLED 程式碼並顯示 Modal
+         * 核心：產生 OLED 程式碼
          */
-        function generateOLEDCode() {
+        function generateOLEDCode(forModal = false) {
             const functionName = functionNameInput.value.trim().replace(/\s+/g, '_') || "_pattern";
             const mode = document.querySelector('input[name="transform-mode"]:checked').value;
             const whiteCells = cells.map((cell, index) => ({ cell, index }))
@@ -362,23 +413,28 @@
 
             if (whiteCells.length === 0) {
                  code = `function ${functionName} () {\n    // 沒有任何白色方格\n}`;
-                 openModalWithCode(code);
-                 return;
-            }
-
-            switch(mode) {
-                case 'vars':
-                    code = generateCodeWithVars(whiteCells, functionName);
-                    break;
-                case 'no-vars':
-                    code = generateCodeWithoutVars(whiteCells, functionName);
-                    break;
-                case 'simplified':
-                    code = generateSimplifiedCode(whiteCells, functionName);
-                    break;
+            } else {
+                 switch(mode) {
+                    case 'vars':
+                        code = generateCodeWithVars(whiteCells, functionName);
+                        break;
+                    case 'no-vars':
+                        code = generateCodeWithoutVars(whiteCells, functionName);
+                        break;
+                    case 'simplified':
+                        code = generateSimplifiedCode(whiteCells, functionName);
+                        break;
+                }
             }
             
-            openModalWithCode(code);
+            if (forModal) {
+                 openModalWithCode(code);
+            }
+            return code;
+        }
+
+        function updateLiveCode() {
+            liveCodeOutput.textContent = generateOLEDCode(false);
         }
         
         function openModalWithCode(code) {
@@ -395,26 +451,28 @@
             formatButton.classList.add('hidden');
         }
 
-        // --- 程式碼產生輔助函式 ---
+        // --- 程式碼產生輔助函式 (Y 座標已轉換) ---
 
         function generateCodeWithVars(whiteCells, functionName) {
             let code = `function ${functionName} (X: number, Y: number) {\n`;
-            let minX = GRID_WIDTH, minY = GRID_HEIGHT;
-            whiteCells.forEach(item => {
-                const x = item.index % GRID_WIDTH;
-                const y = Math.floor(item.index / GRID_WIDTH);
-                if (x < minX) minX = x;
-                if (y < minY) minY = y;
-            });
-            const codeBlocks = whiteCells.map(item => {
-                const x = item.index % GRID_WIDTH;
-                const y = Math.floor(item.index / GRID_WIDTH);
+            
+            const coords = whiteCells.map(item => ({
+                x: item.index % GRID_WIDTH,
+                y: GRID_HEIGHT - 1 - Math.floor(item.index / GRID_WIDTH)
+            }));
+            
+            if (coords.length === 0) return code + '}\n';
+
+            const minX = Math.min(...coords.map(c => c.x));
+            const minY = Math.min(...coords.map(c => c.y));
+
+            const codeBlocks = coords.map(c => {
                 return `    // 一個白色方格
     OLED.drawLine(
-    ${x - minX} + X,
-    ${y - minY} + Y,
-    ${x - minX} + X,
-    ${y - minY} + Y
+    ${c.x - minX} + X,
+    ${c.y - minY} + Y,
+    ${c.x - minX} + X,
+    ${c.y - minY} + Y
     )`;
             });
             return code + codeBlocks.join('\n') + '\n}';
@@ -424,7 +482,7 @@
             let code = `function ${functionName} () {\n`;
             const codeBlocks = whiteCells.map(item => {
                 const x = item.index % GRID_WIDTH;
-                const y = Math.floor(item.index / GRID_WIDTH);
+                const y = GRID_HEIGHT - 1 - Math.floor(item.index / GRID_WIDTH);
                 return `    // 一個白色方格
     OLED.drawLine(
     ${x},
@@ -441,19 +499,25 @@
             const pixels = new Set();
             whiteCells.forEach(item => {
                 const x = item.index % GRID_WIDTH;
-                const y = Math.floor(item.index / GRID_WIDTH);
+                const y = GRID_HEIGHT - 1 - Math.floor(item.index / GRID_WIDTH);
                 pixels.add(`${x},${y}`);
             });
             
             const visited = new Set();
             const lines = [];
 
-            whiteCells.sort((a,b) => a.index - b.index).forEach(item => {
-                const startX = item.index % GRID_WIDTH;
-                const startY = Math.floor(item.index / GRID_WIDTH);
-                const coord = `${startX},${startY}`;
+            const sortedCoords = [...pixels].map(p => {
+                const [x,y] = p.split(',').map(Number);
+                return {x, y};
+            }).sort((a,b) => a.y - b.y || a.x - b.x);
 
-                if (visited.has(coord)) return;
+
+            sortedCoords.forEach(coord => {
+                const startX = coord.x;
+                const startY = coord.y;
+                const pCoord = `${startX},${startY}`;
+
+                if (visited.has(pCoord)) return;
 
                 let hx = startX;
                 while(pixels.has(`${hx + 1},${startY}`)) hx++;
@@ -515,6 +579,7 @@
             newState.forEach((isWhite, index) => {
                 cells[index].classList.toggle('white', isWhite);
             });
+            updateLiveCode();
         }
         
         /**
@@ -533,12 +598,10 @@
 
             if (whiteCellCoords.length === 0) return;
 
-            // 1. 計算圖案中心
             const sum = whiteCellCoords.reduce((acc, pos) => ({ x: acc.x + pos.x, y: acc.y + pos.y }), { x: 0, y: 0 });
             const centerX = sum.x / whiteCellCoords.length;
             const centerY = sum.y / whiteCellCoords.length;
 
-            // 2. 計算新位置並用 Set 儲存避免重複
             const newWhiteIndices = new Set();
             whiteCellCoords.forEach(pos => {
                 const dx = pos.x - centerX;
@@ -547,47 +610,48 @@
                 const newX = Math.round(centerX + dx * scaleFactor);
                 const newY = Math.round(centerY + dy * scaleFactor);
                 
-                // 3. 檢查邊界
                 if (newX >= 0 && newX < GRID_WIDTH && newY >= 0 && newY < GRID_HEIGHT) {
-                    const newIndex = newY * GRID_WIDTH + newX;
-                    newWhiteIndices.add(newIndex);
+                    newWhiteIndices.add(newY * GRID_WIDTH + newX);
                 }
             });
 
-            // 4. 重繪圖案
             cells.forEach(cell => cell.classList.remove('white'));
             newWhiteIndices.forEach(index => {
                 cells[index].classList.add('white');
             });
+            updateLiveCode();
         }
 
 
         // --- 事件監聽 ---
         gridContainer.addEventListener('mousedown', (event) => {
             isMouseDown = true;
-            drawCell(event.target);
+            drawOnGrid(event);
             event.preventDefault();
         });
         gridContainer.addEventListener('mouseover', (event) => {
             if (isMouseDown) {
-                drawCell(event.target);
+                drawOnGrid(event);
             }
         });
         document.addEventListener('mouseup', () => { isMouseDown = false; });
+        gridContainer.addEventListener('contextmenu', e => e.preventDefault());
         
         resetButton.addEventListener('click', () => {
             cells.forEach(cell => cell.classList.remove('white'));
+            updateLiveCode();
         });
 
         invertColorsButton.addEventListener('click', () => {
             cells.forEach(cell => cell.classList.toggle('white'));
+            updateLiveCode();
         });
 
-        transformButton.addEventListener('click', generateOLEDCode);
+        transformButton.addEventListener('click', () => generateOLEDCode(true));
         
         loadFromCodeButton.addEventListener('click', () => {
             openModalWithCode('');
-            editButton.click(); // 直接進入編輯模式
+            editButton.click();
         });
 
         // Movement listeners
@@ -654,18 +718,23 @@
         /**
          * 在畫布上繪製一條線 (Bresenham's algorithm)
          */
-        function drawLineOnGrid(x1, y1, x2, y2) {
-            let dx = Math.abs(x2 - x1), sx = x1 < x2 ? 1 : -1;
+        function drawLineOnGrid(x1, y1_code, x2, y2_code) {
+            // Transform code's y-coord (bottom-left 0,0) to grid's y-coord (top-left 0,0)
+            let y1 = GRID_HEIGHT - 1 - y1_code;
+            let y2 = GRID_HEIGHT - 1 - y2_code;
+            let x_start = x1; // temp var for loop
+
+            let dx = Math.abs(x2 - x_start), sx = x_start < x2 ? 1 : -1;
             let dy = -Math.abs(y2 - y1), sy = y1 < y2 ? 1 : -1;
             let err = dx + dy, e2;
 
             while (true) {
-                if (x1 >= 0 && x1 < GRID_WIDTH && y1 >= 0 && y1 < GRID_HEIGHT) {
-                    cells[Math.round(y1) * GRID_WIDTH + Math.round(x1)].classList.add('white');
+                if (x_start >= 0 && x_start < GRID_WIDTH && y1 >= 0 && y1 < GRID_HEIGHT) {
+                    cells[Math.round(y1) * GRID_WIDTH + Math.round(x_start)].classList.add('white');
                 }
-                if (x1 === x2 && y1 === y2) break;
+                if (x_start === x2 && y1 === y2) break;
                 e2 = 2 * err;
-                if (e2 >= dy) { err += dy; x1 += sx; }
+                if (e2 >= dy) { err += dy; x_start += sx; }
                 if (e2 <= dx) { err += dx; y1 += sy; }
             }
         }
@@ -684,26 +753,19 @@
             };
 
             try {
-                // 移除 TypeScript 類型註解使其成為有效的 JavaScript
                 const sanitizedCode = code.replace(/:[^,)]+/g, '');
-
                 const functionNameMatch = sanitizedCode.match(/function\s*([^\s(]+)/);
-                const paramsMatch = sanitizedCode.match(/function[^{]+\(([^)]*)\)/); // 檢查參數
+                const paramsMatch = sanitizedCode.match(/function[^{]+\(([^)]*)\)/);
 
                 if (functionNameMatch && functionNameMatch[1]) {
                     const functionName = functionNameMatch[1];
-                    let functionCall = `${functionName}()`; // 預設呼叫
-                    
-                    // 如果函式定義中有參數，就用 (0, 0) 去呼叫
+                    let functionCall = `${functionName}()`; 
                     if (paramsMatch && paramsMatch[1] && paramsMatch[1].trim() !== '') {
                         functionCall = `${functionName}(0, 0)`;
                     }
-
                     const executor = new Function('OLED', sanitizedCode + `\nif (typeof ${functionName} === 'function') { ${functionCall}; }`);
                     executor(OLED_mock);
-
                 } else {
-                    // 如果沒有 function，退回簡易解析模式
                     const regex = /OLED\.drawLine\s*\(([\s\S]*?)\)/g;
                     let match;
                     while ((match = regex.exec(sanitizedCode)) !== null) {
@@ -739,10 +801,11 @@
                     modalTitle.textContent = '程式碼編輯器';
                     modalTitle.style.color = '';
                 }, 3000);
-                return; // 發生錯誤時，停留在 Modal
+                return;
             }
             
             closeModal();
+            updateLiveCode();
         });
 
         formatButton.addEventListener('click', () => {
@@ -752,9 +815,7 @@
 
             const paramsMatch = code.match(/function[^{]+\(([^)]*)\)/);
             let params = paramsMatch ? paramsMatch[1].trim() : '';
-            // 移除參數中的類型註解
             params = params.replace(/:[^,)]+/g, '').replace(/\s+/g, ' ').trim();
-
 
             const drawCalls = code.match(/OLED\.drawLine\s*\(([\s\S]*?)\)/g) || [];
 
@@ -788,6 +849,7 @@
 
         // --- 程式初始化 ---
         createGrid();
+        updateLiveCode();
     </script>
 
 </body>
