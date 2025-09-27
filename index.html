@@ -18,6 +18,7 @@
             box-sizing: border-box;
             background-color: #f0f4f8; /* 淡雅的背景色 */
             color: #333;
+            overflow-x: hidden;
         }
 
         h1 {
@@ -43,14 +44,14 @@
             gap: 10px;
         }
         
-        #transform-options, #movement-controls, #zoom-controls {
+        #tool-selection, #transform-options, #movement-controls, #zoom-controls, #selection-actions {
             background-color: #ecf0f1;
             padding: 10px 15px;
             border-radius: 12px;
             border: 1px solid #bdc3c7;
         }
         
-        #transform-options label, #movement-controls label {
+        #tool-selection label, #transform-options label, #movement-controls label {
             cursor: pointer;
             padding: 5px;
         }
@@ -62,8 +63,13 @@
             border: none;
             border-radius: 8px;
             color: white;
-            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            transition: all 0.2s ease;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+            box-shadow: none;
         }
         
         .action-button {
@@ -73,19 +79,14 @@
             padding: 0;
             line-height: 40px;
         }
-        .move-button {
-            background-color: #27ae60;
-        }
-        .move-button:hover {
-            background-color: #229954;
-        }
-        .zoom-button {
-             background-color: #f39c12;
-        }
-        .zoom-button:hover {
-            background-color: #e67e22;
-        }
-
+        .move-button { background-color: #27ae60; }
+        .move-button:hover:not(:disabled) { background-color: #229954; }
+        .zoom-button { background-color: #f39c12; }
+        .zoom-button:hover:not(:disabled) { background-color: #e67e22; }
+        .selection-btn { background-color: #2980b9; font-size: 14px; padding: 5px 10px; }
+        .selection-btn:hover:not(:disabled) { background-color: #2471a3; }
+        .history-btn { background-color: #8e44ad; }
+        .history-btn:hover:not(:disabled) { background-color: #7d3c98; }
 
         #function-name-input {
             padding: 9px;
@@ -119,6 +120,10 @@
             gap: 1px;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
             user-select: none;
+            cursor: crosshair;
+        }
+        #grid-container.selection-mode {
+            cursor: default;
         }
 
         /* 網格中的單一儲存格 */
@@ -126,8 +131,17 @@
             width: var(--cell-size);
             height: var(--cell-size);
             background-color: black;
+            position: relative;
         }
         .grid-cell.white { background-color: white; }
+        .grid-cell.selected::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(52, 152, 219, 0.5); /* 半透明藍色 */
+            pointer-events: none; /* 讓滑鼠事件穿透 */
+        }
         
         #live-code-display {
             width: 100%;
@@ -149,9 +163,49 @@
             overflow-y: auto;
             white-space: pre-wrap;
             word-wrap: break-word;
-            word-break: break-all; /* 修正文字重疊問題 */
+            word-break: break-all;
             font-family: 'Courier New', Courier, monospace;
             font-size: 14px;
+        }
+        
+        /* OLED 預覽視窗 */
+        #oled-preview {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            background-color: #34495e;
+            border: 2px solid #2c3e50;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            z-index: 1001;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            min-width: 138px; /* 128 + borders + padding */
+            min-height: 78px; /* 64 + header + borders + padding */
+        }
+        #oled-header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 5px;
+            cursor: move;
+            text-align: center;
+            font-size: 12px;
+            border-radius: 4px 4px 0 0;
+            user-select: none;
+        }
+        #oled-canvas {
+            background-color: black;
+            image-rendering: pixelated;
+        }
+        #oled-resize-handle {
+            width: 10px;
+            height: 10px;
+            background-color: #7f8c8d;
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            cursor: nwse-resize;
         }
 
 
@@ -171,14 +225,10 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s ease;
-            z-index: 1000;
+            z-index: 1002;
         }
 
-        #code-modal.visible {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
+        #code-modal.visible { opacity: 1; pointer-events: auto; }
         .modal-content {
             background-color: #2d3436;
             color: #dfe6e9;
@@ -191,25 +241,14 @@
             flex-direction: column;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
-        
         .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
         }
-        
-        .modal-header h2 { 
-            margin: 0; 
-            transition: color 0.3s ease;
-        }
-
-        .modal-close {
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            color: #b2bec3;
-        }
+        .modal-header h2 { margin: 0; transition: color 0.3s ease; }
+        .modal-close { font-size: 28px; font-weight: bold; cursor: pointer; color: #b2bec3; }
         .modal-close:hover { color: #fff; }
 
         pre, #code-editor {
@@ -222,18 +261,16 @@
             overflow-y: auto;
             white-space: pre-wrap;
             word-wrap: break-word;
-            word-break: break-all; /* 修正文字重疊問題 */
+            word-break: break-all;
             font-family: 'Courier New', Courier, monospace;
             font-size: 14px;
         }
-        
         #code-editor {
             border: 1px solid #555;
             color: #dfe6e9;
             resize: vertical;
-            width: calc(100% - 32px); /* 扣掉 padding */
+            width: calc(100% - 32px);
         }
-        
         .modal-actions {
             margin-top: 15px;
             display: flex;
@@ -241,12 +278,7 @@
             justify-content: flex-end;
             gap: 10px;
         }
-
-        .modal-actions button {
-            padding: 8px 16px;
-            font-size: 14px;
-        }
-
+        .modal-actions button { padding: 8px 16px; font-size: 14px; }
         #copy-button { background-color: #00b894; }
         #copy-button:hover { background-color: #009e7e; }
         #copy-button:disabled { background-color: #555; cursor: not-allowed;}
@@ -273,11 +305,28 @@
             <button id="reset-button">清除畫布</button>
         </div>
         <div class="control-row">
-            <div id="transform-options">
+             <div id="tool-selection">
+                <span>工具：</span>
+                <label><input type="radio" name="tool" value="draw" checked> 繪製</label>
+                <label><input type="radio" name="tool" value="select"> 選取</label>
+            </div>
+             <div id="transform-options">
                 <span>轉換模式：</span>
-                <label><input type="radio" name="transform-mode" value="vars" checked> 有變數</label>
-                <label><input type="radio" name="transform-mode" value="no-vars"> 無變數</label>
-                <label><input type="radio" name="transform-mode" value="simplified"> 簡化代碼</label>
+                <label><input type="checkbox" name="transform-mode" value="vars" checked> 有變數</label>
+                <label><input type="checkbox" name="transform-mode" value="simplified"> 簡化代碼</label>
+            </div>
+            <div id="history-controls">
+                <button id="undo-button" class="history-btn">復原</button>
+                <button id="redo-button" class="history-btn">重做</button>
+            </div>
+        </div>
+        <div class="control-row hidden" id="selection-controls">
+            <div id="selection-actions">
+                <span>選取動作：</span>
+                <button id="select-all-button" class="selection-btn">全選</button>
+                <button id="copy-button-main" class="selection-btn">複製</button>
+                <button id="paste-button-main" class="selection-btn">貼上</button>
+                <button id="duplicate-button-main" class="selection-btn">建立副本</button>
             </div>
             <div id="movement-controls">
                  <span>移動圖形：</span>
@@ -303,6 +352,14 @@
         <h3>即時預覽程式碼</h3>
         <pre><code id="live-code-output"></code></pre>
     </div>
+
+    <!-- OLED Preview Window -->
+    <div id="oled-preview">
+        <div id="oled-header">OLED 預覽</div>
+        <canvas id="oled-canvas" width="128" height="64"></canvas>
+        <div id="oled-resize-handle"></div>
+    </div>
+
 
     <!-- 程式碼輸出 Modal -->
     <div id="code-modal">
@@ -332,6 +389,7 @@
         const invertColorsButton = document.getElementById('invert-colors-button');
         const functionNameInput = document.getElementById('function-name-input');
         const liveCodeOutput = document.getElementById('live-code-output');
+        const selectionControls = document.getElementById('selection-controls');
         
         // Modal 相關元素
         const codeModal = document.getElementById('code-modal');
@@ -345,13 +403,27 @@
         const loadButton = document.getElementById('load-button');
         const formatButton = document.getElementById('format-button');
 
-        // Movement & Zoom Buttons
+        // Action Buttons
         const moveUpButton = document.getElementById('move-up-button');
         const moveDownButton = document.getElementById('move-down-button');
         const moveLeftButton = document.getElementById('move-left-button');
         const moveRightButton = document.getElementById('move-right-button');
         const zoomInButton = document.getElementById('zoom-in-button');
         const zoomOutButton = document.getElementById('zoom-out-button');
+        const selectAllButton = document.getElementById('select-all-button');
+        const copyMainButton = document.getElementById('copy-button-main');
+        const pasteMainButton = document.getElementById('paste-button-main');
+        const duplicateMainButton = document.getElementById('duplicate-button-main');
+        const undoButton = document.getElementById('undo-button');
+        const redoButton = document.getElementById('redo-button');
+        
+        // OLED Preview
+        const oledPreview = document.getElementById('oled-preview');
+        const oledHeader = document.getElementById('oled-header');
+        const oledCanvas = document.getElementById('oled-canvas');
+        const oledCtx = oledCanvas.getContext('2d');
+        const oledResizeHandle = document.getElementById('oled-resize-handle');
+
 
         // --- 常數設定 ---
         const GRID_WIDTH = 128;
@@ -359,72 +431,100 @@
 
         // --- 狀態變數 ---
         let isMouseDown = false;
-        let cells = []; // 存放所有方格元素
+        let isMiddleMouseDown = false;
+        let cells = []; 
+        let currentTool = 'draw';
+        let selection = new Set();
+        let clipboard = null;
+        
+        // History
+        let history = [];
+        let historyIndex = -1;
 
-        /**
-         * 建立並渲染所有網格方塊
-         */
+        // --- 程式初始化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            createGrid();
+            setupEventListeners();
+            saveState();
+            updateLiveCode();
+            updateOledPreviewSize(); // Update preview size on init
+        });
+
         function createGrid() {
             const fragment = document.createDocumentFragment();
             for (let i = 0; i < GRID_WIDTH * GRID_HEIGHT; i++) {
                 const cell = document.createElement('div');
                 cell.classList.add('grid-cell');
+                cell.dataset.index = i;
                 fragment.appendChild(cell);
             }
             gridContainer.appendChild(fragment);
             cells = Array.from(gridContainer.children);
         }
-        
-        /**
-         * 處理滑鼠繪圖的核心邏輯
-         */
-        function drawOnGrid(event) {
+
+        // --- 核心繪圖/選取邏輯 ---
+        function handleGridInteraction(event) {
             const targetCell = event.target;
             if (!targetCell || !targetCell.classList.contains('grid-cell')) return;
 
-            let changed = false;
-            // `event.buttons`: 1 for left, 2 for right
-            if (event.buttons === 1) { // Left mouse button
-                if (!targetCell.classList.contains('white')) {
-                    targetCell.classList.add('white');
-                    changed = true;
+            const index = parseInt(targetCell.dataset.index, 10);
+            let needsVisualUpdate = false;
+            let stateChanged = false;
+
+            if (currentTool === 'draw') {
+                if (event.buttons === 1) { // Left mouse button -> draw white
+                    if (!targetCell.classList.contains('white')) {
+                        targetCell.classList.add('white');
+                        stateChanged = true;
+                    }
+                } else if (event.buttons === 2) { // Right mouse button -> draw black
+                    if (targetCell.classList.contains('white')) {
+                        targetCell.classList.remove('white');
+                        stateChanged = true;
+                    }
                 }
-            } else if (event.buttons === 2) { // Right mouse button
-                if (targetCell.classList.contains('white')) {
-                    targetCell.classList.remove('white');
-                    changed = true;
+            } else if (currentTool === 'select') {
+                if (event.buttons === 1) { // Left mouse button -> select
+                    if (targetCell.classList.contains('white') && !selection.has(index)) {
+                        selection.add(index);
+                        needsVisualUpdate = true;
+                    }
+                } else if (event.buttons === 2) { // Right mouse button -> deselect
+                    if (selection.has(index)) {
+                        selection.delete(index);
+                        needsVisualUpdate = true;
+                    }
                 }
             }
-            if (changed) {
-                updateLiveCode();
-            }
+            
+            if (needsVisualUpdate) updateSelectionVisuals();
+            if (stateChanged) updateLiveCode();
+        }
+
+        function updateSelectionVisuals() {
+            cells.forEach((cell, i) => {
+                cell.classList.toggle('selected', selection.has(i));
+            });
         }
         
-        /**
-         * 核心：產生 OLED 程式碼
-         */
+        // --- 核心程式碼產生邏輯 ---
         function generateOLEDCode(forModal = false) {
             const functionName = functionNameInput.value.trim().replace(/\s+/g, '_') || "_pattern";
-            const mode = document.querySelector('input[name="transform-mode"]:checked').value;
+            const useVars = document.querySelector('input[name="transform-mode"][value="vars"]').checked;
+            const useSimplified = document.querySelector('input[name="transform-mode"][value="simplified"]').checked;
+
             const whiteCells = cells.map((cell, index) => ({ cell, index }))
                                     .filter(item => item.cell.classList.contains('white'));
             
-            let code = '';
-
             if (whiteCells.length === 0) {
-                 code = `function ${functionName} () {\n    // 沒有任何白色方格\n}`;
+                 return `function ${functionName} () {\n    // 沒有任何白色方格\n}`;
+            }
+
+            let code;
+            if (useSimplified) {
+                code = generateSimplifiedCode(whiteCells, functionName, useVars);
             } else {
-                 switch(mode) {
-                    case 'vars':
-                        code = generateCodeWithVars(whiteCells, functionName);
-                        break;
-                    case 'no-vars':
-                        code = generateCodeWithoutVars(whiteCells, functionName);
-                        break;
-                    case 'simplified':
-                        code = generateSimplifiedCode(whiteCells, functionName);
-                        break;
-                }
+                code = generatePointByPointCode(whiteCells, functionName, useVars);
             }
             
             if (forModal) {
@@ -435,8 +535,393 @@
 
         function updateLiveCode() {
             liveCodeOutput.textContent = generateOLEDCode(false);
+            updateOledPreview();
         }
         
+        // --- 程式碼產生輔助函式 (Y 座標已轉換為左上角) ---
+
+        function generatePointByPointCode(whiteCells, functionName, useVars) {
+            let params = useVars ? '(X: number, Y: number)' : '()';
+            let code = `function ${functionName} ${params} {\n`;
+            
+            const coords = whiteCells.map(item => ({
+                x: item.index % GRID_WIDTH,
+                y: Math.floor(item.index / GRID_WIDTH)
+            }));
+            
+            let minX = 0, minY = 0;
+            if (useVars && coords.length > 0) {
+                minX = Math.min(...coords.map(c => c.x));
+                minY = Math.min(...coords.map(c => c.y));
+            }
+
+            const codeBlocks = coords.map(c => {
+                const finalX = useVars ? `${c.x - minX} + X` : c.x;
+                const finalY = useVars ? `${c.y - minY} + Y` : c.y;
+                return `    // 一個白色方格
+    OLED.drawLine(
+    ${finalX},
+    ${finalY},
+    ${finalX},
+    ${finalY}
+    )`;
+            });
+            return code + codeBlocks.join('\n') + '\n}';
+        }
+        
+        function generateSimplifiedCode(whiteCells, functionName, useVars) {
+            let params = useVars ? '(X: number, Y: number)' : '()';
+            let code = `function ${functionName} ${params} {\n`;
+            
+            const pixels = new Set();
+            whiteCells.forEach(item => {
+                const x = item.index % GRID_WIDTH;
+                const y = Math.floor(item.index / GRID_WIDTH);
+                pixels.add(`${x},${y}`);
+            });
+            
+            const visited = new Set();
+            const lines = [];
+
+            const sortedCoords = [...pixels].map(p => {
+                const [x,y] = p.split(',').map(Number);
+                return {x, y};
+            }).sort((a,b) => a.y - b.y || a.x - b.x);
+
+            sortedCoords.forEach(coord => {
+                const startX = coord.x;
+                const startY = coord.y;
+                if (visited.has(`${startX},${startY}`)) return;
+
+                let hx = startX; while(pixels.has(`${hx + 1},${startY}`)) hx++;
+                let vy = startY; while(pixels.has(`${startX},${vy + 1}`)) vy++;
+
+                if ((hx - startX) >= (vy - startY)) {
+                    lines.push({ x1: startX, y1: startY, x2: hx, y2: startY });
+                    for (let i = startX; i <= hx; i++) visited.add(`${i},${startY}`);
+                } else {
+                    lines.push({ x1: startX, y1: startY, x2: startX, y2: vy });
+                    for (let i = startY; i <= vy; i++) visited.add(`${startX},${i}`);
+                }
+            });
+
+            let minX = 0, minY = 0;
+            if (useVars && lines.length > 0) {
+                minX = Math.min(...lines.map(l => l.x1));
+                minY = Math.min(...lines.map(l => l.y1));
+            }
+
+            const codeBlocks = lines.map(line => {
+                const x1 = useVars ? `${line.x1 - minX} + X` : line.x1;
+                const y1 = useVars ? `${line.y1 - minY} + Y` : line.y1;
+                const x2 = useVars ? `${line.x2 - minX} + X` : line.x2;
+                const y2 = useVars ? `${line.y2 - minY} + Y` : line.y2;
+                return `    // 一條線/一個方格
+    OLED.drawLine(
+    ${x1},
+    ${y1},
+    ${x2},
+    ${y2}
+    )`;
+            });
+            return code + codeBlocks.join('\n') + '\n}';
+        }
+
+        // --- 動作與功能 ---
+
+        function moveSelection(dx, dy) {
+            if (selection.size === 0) return;
+            const bgColorIsWhite = document.querySelector('input[name="move-bg"][value="white"]').checked;
+            const changes = new Map();
+            const newSelection = new Set();
+
+            for (const index of selection) {
+                changes.set(index, bgColorIsWhite);
+            }
+            
+            for (const index of selection) {
+                const x = index % GRID_WIDTH;
+                const y = Math.floor(index / GRID_WIDTH);
+                const newX = x + dx;
+                const newY = y + dy;
+
+                if (newX >= 0 && newX < GRID_WIDTH && newY >= 0 && newY < GRID_HEIGHT) {
+                    const newIndex = newY * GRID_WIDTH + newX;
+                    changes.set(newIndex, true);
+                    newSelection.add(newIndex);
+                }
+            }
+            
+            for (const [index, isWhite] of changes.entries()) {
+                cells[index].classList.toggle('white', isWhite);
+            }
+            
+            selection = newSelection;
+            updateSelectionVisuals();
+            saveState();
+        }
+        
+        function scaleSelection(scaleFactor) {
+            if (selection.size === 0) return;
+            const selectedCoords = [...selection].map(index => ({
+                x: index % GRID_WIDTH,
+                y: Math.floor(index / GRID_WIDTH)
+            }));
+
+            const sum = selectedCoords.reduce((acc, pos) => ({ x: acc.x + pos.x, y: acc.y + pos.y }), { x: 0, y: 0 });
+            const centerX = sum.x / selectedCoords.length;
+            const centerY = sum.y / selectedCoords.length;
+
+            const newWhiteIndices = new Set(
+                [...cells].map((c, i) => c.classList.contains('white') ? i : -1).filter(i => i !== -1 && !selection.has(i))
+            );
+            const newSelection = new Set();
+
+            selectedCoords.forEach(pos => {
+                const newX = Math.round(centerX + (pos.x - centerX) * scaleFactor);
+                const newY = Math.round(centerY + (pos.y - centerY) * scaleFactor);
+                
+                if (newX >= 0 && newX < GRID_WIDTH && newY >= 0 && newY < GRID_HEIGHT) {
+                    const newIndex = newY * GRID_WIDTH + newX;
+                    newWhiteIndices.add(newIndex);
+                    newSelection.add(newIndex);
+                }
+            });
+
+            cells.forEach((cell, i) => cell.classList.toggle('white', newWhiteIndices.has(i)));
+            selection = newSelection;
+            updateSelectionVisuals();
+            saveState();
+        }
+
+        // --- 事件監聽器設定 ---
+        function setupEventListeners() {
+            // Grid Interaction
+            gridContainer.addEventListener('mousedown', (event) => {
+                if(event.button === 1) { // Middle mouse button
+                    isMiddleMouseDown = true;
+                }
+                isMouseDown = true;
+                handleGridInteraction(event);
+                event.preventDefault();
+            });
+            gridContainer.addEventListener('mouseover', (event) => {
+                if (isMouseDown) {
+                    handleGridInteraction(event);
+                }
+                if (isMiddleMouseDown && currentTool === 'select' && selection.size > 0) {
+                    moveSelection(event.movementX, event.movementY);
+                }
+            });
+            document.addEventListener('mouseup', () => {
+                if (isMouseDown) saveState();
+                isMouseDown = false;
+                isMiddleMouseDown = false;
+            });
+            gridContainer.addEventListener('contextmenu', e => e.preventDefault());
+            document.querySelectorAll('input[name="tool"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    currentTool = e.target.value;
+                    selection.clear();
+                    updateSelectionVisuals();
+                    gridContainer.classList.toggle('selection-mode', currentTool === 'select');
+                    selectionControls.classList.toggle('hidden', currentTool !== 'select');
+                });
+            });
+            document.querySelectorAll('input[name="transform-mode"]').forEach(cb => cb.addEventListener('change', updateLiveCode));
+
+            
+            // Main Controls
+            resetButton.addEventListener('click', () => {
+                cells.forEach(cell => cell.classList.remove('white'));
+                saveState();
+            });
+            invertColorsButton.addEventListener('click', () => {
+                cells.forEach(cell => cell.classList.toggle('white'));
+                saveState();
+            });
+            transformButton.addEventListener('click', () => generateOLEDCode(true));
+            loadFromCodeButton.addEventListener('click', () => {
+                openModalWithCode('');
+                editButton.click();
+            });
+
+            // Selection Controls
+            selectAllButton.addEventListener('click', () => {
+                selection.clear();
+                cells.forEach((cell, i) => {
+                    if (cell.classList.contains('white')) selection.add(i);
+                });
+                updateSelectionVisuals();
+            });
+            copyMainButton.addEventListener('click', () => {
+                if (selection.size === 0) return;
+                const selectedCoords = [...selection].map(index => ({ x: index % GRID_WIDTH, y: Math.floor(index / GRID_WIDTH) }));
+                const minX = Math.min(...selectedCoords.map(c => c.x));
+                const minY = Math.min(...selectedCoords.map(c => c.y));
+                clipboard = selectedCoords.map(c => ({ x: c.x - minX, y: c.y - minY }));
+            });
+            pasteMainButton.addEventListener('click', () => {
+                if (!clipboard) return;
+                selection.clear();
+                const newWhiteIndices = new Set(
+                    [...cells].map((c, i) => c.classList.contains('white') ? i : -1).filter(i => i !== -1)
+                );
+                clipboard.forEach(c => {
+                    const index = c.y * GRID_WIDTH + c.x;
+                    newWhiteIndices.add(index);
+                    selection.add(index);
+                });
+                cells.forEach((cell, i) => cell.classList.toggle('white', newWhiteIndices.has(i)));
+                updateSelectionVisuals();
+                saveState();
+            });
+            duplicateMainButton.addEventListener('click', () => {
+                copyMainButton.click();
+                moveSelection(1, 1);
+            });
+
+            // Movement & Zoom Listeners
+            moveRightButton.addEventListener('click', () => moveSelection(1, 0));
+            moveLeftButton.addEventListener('click', () => moveSelection(-1, 0));
+            moveDownButton.addEventListener('click', () => moveSelection(0, 1));
+            moveUpButton.addEventListener('click', () => moveSelection(0, -1));
+            zoomInButton.addEventListener('click', () => scaleSelection(1.1));
+            zoomOutButton.addEventListener('click', () => scaleSelection(0.9));
+
+            // History listeners
+            undoButton.addEventListener('click', handleUndo);
+            redoButton.addEventListener('click', handleRedo);
+
+            // Keyboard Shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    switch(e.key.toLowerCase()) {
+                        case 'a': e.preventDefault(); if(currentTool === 'select') selectAllButton.click(); break;
+                        case 'c': e.preventDefault(); if(currentTool === 'select') copyMainButton.click(); break;
+                        case 'v': e.preventDefault(); if(currentTool === 'select') pasteMainButton.click(); break;
+                        case 'd': e.preventDefault(); if(currentTool === 'select') duplicateMainButton.click(); break;
+                        case 'z': e.preventDefault(); handleUndo(); break;
+                        case 'y': e.preventDefault(); handleRedo(); break;
+                    }
+                }
+                 if (currentTool === 'select' && selection.size > 0) {
+                    switch(e.key) {
+                        case 'ArrowUp': e.preventDefault(); moveSelection(0, -1); break;
+                        case 'ArrowDown': e.preventDefault(); moveSelection(0, 1); break;
+                        case 'ArrowLeft': e.preventDefault(); moveSelection(-1, 0); break;
+                        case 'ArrowRight': e.preventDefault(); moveSelection(1, 0); break;
+                        case '+': case '=': e.preventDefault(); scaleSelection(1.1); break;
+                        case '-': case '_': e.preventDefault(); scaleSelection(0.9); break;
+                    }
+                 }
+            });
+
+            // OLED Preview Listeners
+            let isDraggingOled = false, isResizingOled = false;
+            let oledOffsetX, oledOffsetY, oledStartX, oledStartY, oledStartW, oledStartH;
+            
+            oledHeader.addEventListener('mousedown', (e) => {
+                isDraggingOled = true;
+                oledOffsetX = e.clientX - oledPreview.offsetLeft;
+                oledOffsetY = e.clientY - oledPreview.offsetTop;
+            });
+            oledResizeHandle.addEventListener('mousedown', (e) => {
+                isResizingOled = true;
+                oledStartX = e.clientX;
+                oledStartY = e.clientY;
+                oledStartW = oledPreview.offsetWidth;
+                oledStartH = oledPreview.offsetHeight;
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isDraggingOled) {
+                    oledPreview.style.left = `${e.clientX - oledOffsetX}px`;
+                    oledPreview.style.top = `${e.clientY - oledOffsetY}px`;
+                }
+                if (isResizingOled) {
+                    const newWidth = oledStartW + (e.clientX - oledStartX);
+                    const newHeight = oledStartH + (e.clientY - oledStartY);
+                    oledPreview.style.width = `${newWidth}px`;
+                    oledPreview.style.height = `${newHeight}px`;
+                    const canvasSize = Math.min(newWidth - 10, (newHeight - 30));
+                    oledCanvas.style.width = `${canvasSize}px`;
+                    oledCanvas.style.height = `${canvasSize / 2}px`;
+                    updateOledPreviewSize();
+                }
+            });
+            document.addEventListener('mouseup', () => {
+                isDraggingOled = false;
+                isResizingOled = false;
+            });
+        }
+        
+        // --- History (Undo/Redo) ---
+        function saveState() {
+            const state = cells.map(c => c.classList.contains('white'));
+            
+            if (historyIndex < history.length - 1) {
+                history = history.slice(0, historyIndex + 1);
+            }
+            history.push(state);
+            historyIndex++;
+            updateHistoryButtons();
+            updateLiveCode();
+        }
+
+        function restoreState(state) {
+             if (!state) return;
+             state.forEach((isWhite, i) => {
+                cells[i].classList.toggle('white', isWhite);
+             });
+             updateLiveCode();
+        }
+
+        function handleUndo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                restoreState(history[historyIndex]);
+            }
+            updateHistoryButtons();
+        }
+
+        function handleRedo() {
+             if (historyIndex < history.length - 1) {
+                historyIndex++;
+                restoreState(history[historyIndex]);
+            }
+            updateHistoryButtons();
+        }
+        
+        function updateHistoryButtons() {
+            undoButton.disabled = historyIndex <= 0;
+            redoButton.disabled = historyIndex >= history.length - 1;
+        }
+
+        // --- OLED Preview ---
+        function updateOledPreview() {
+            oledCtx.clearRect(0, 0, GRID_WIDTH, GRID_HEIGHT);
+            cells.forEach((cell, index) => {
+                if (cell.classList.contains('white')) {
+                    const x = index % GRID_WIDTH;
+                    const y = Math.floor(index / GRID_WIDTH);
+                    oledCtx.fillStyle = 'white';
+                    oledCtx.fillRect(x, y, 1, 1);
+                }
+            });
+        }
+        
+        function updateOledPreviewSize() {
+            const canvasDisplayWidth = oledCanvas.offsetWidth;
+            const canvasDisplayHeight = oledCanvas.offsetHeight;
+            oledHeader.textContent = `OLED 預覽 (${canvasDisplayWidth}x${canvasDisplayHeight})`;
+        }
+        
+        // --- Modal & Code Loading ---
+        // (Includes previous fixes for code execution and y-coordinate transformation)
+        function closeModal() { codeModal.classList.remove('visible'); }
+        // ... The rest of the modal functions from the previous version are assumed to be here and correct.
+        // I will add the necessary functions for the modal from the previous file to ensure completeness
         function openModalWithCode(code) {
             modalTitle.textContent = '程式碼編輯器';
             modalTitle.style.color = '';
@@ -451,225 +936,9 @@
             formatButton.classList.add('hidden');
         }
 
-        // --- 程式碼產生輔助函式 (Y 座標已轉換) ---
-
-        function generateCodeWithVars(whiteCells, functionName) {
-            let code = `function ${functionName} (X: number, Y: number) {\n`;
-            
-            const coords = whiteCells.map(item => ({
-                x: item.index % GRID_WIDTH,
-                y: GRID_HEIGHT - 1 - Math.floor(item.index / GRID_WIDTH)
-            }));
-            
-            if (coords.length === 0) return code + '}\n';
-
-            const minX = Math.min(...coords.map(c => c.x));
-            const minY = Math.min(...coords.map(c => c.y));
-
-            const codeBlocks = coords.map(c => {
-                return `    // 一個白色方格
-    OLED.drawLine(
-    ${c.x - minX} + X,
-    ${c.y - minY} + Y,
-    ${c.x - minX} + X,
-    ${c.y - minY} + Y
-    )`;
-            });
-            return code + codeBlocks.join('\n') + '\n}';
-        }
-
-        function generateCodeWithoutVars(whiteCells, functionName) {
-            let code = `function ${functionName} () {\n`;
-            const codeBlocks = whiteCells.map(item => {
-                const x = item.index % GRID_WIDTH;
-                const y = GRID_HEIGHT - 1 - Math.floor(item.index / GRID_WIDTH);
-                return `    // 一個白色方格
-    OLED.drawLine(
-    ${x},
-    ${y},
-    ${x},
-    ${y}
-    )`;
-            });
-            return code + codeBlocks.join('\n') + '\n}';
-        }
-        
-        function generateSimplifiedCode(whiteCells, functionName) {
-            let code = `function ${functionName} () {\n`;
-            const pixels = new Set();
-            whiteCells.forEach(item => {
-                const x = item.index % GRID_WIDTH;
-                const y = GRID_HEIGHT - 1 - Math.floor(item.index / GRID_WIDTH);
-                pixels.add(`${x},${y}`);
-            });
-            
-            const visited = new Set();
-            const lines = [];
-
-            const sortedCoords = [...pixels].map(p => {
-                const [x,y] = p.split(',').map(Number);
-                return {x, y};
-            }).sort((a,b) => a.y - b.y || a.x - b.x);
-
-
-            sortedCoords.forEach(coord => {
-                const startX = coord.x;
-                const startY = coord.y;
-                const pCoord = `${startX},${startY}`;
-
-                if (visited.has(pCoord)) return;
-
-                let hx = startX;
-                while(pixels.has(`${hx + 1},${startY}`)) hx++;
-                
-                let vy = startY;
-                while(pixels.has(`${startX},${vy + 1}`)) vy++;
-
-                if ((hx - startX) >= (vy - startY)) {
-                    lines.push({ x1: startX, y1: startY, x2: hx, y2: startY });
-                    for (let i = startX; i <= hx; i++) visited.add(`${i},${startY}`);
-                } else {
-                    lines.push({ x1: startX, y1: startY, x2: startX, y2: vy });
-                    for (let i = startY; i <= vy; i++) visited.add(`${startX},${i}`);
-                }
-            });
-
-            const codeBlocks = lines.map(line => {
-                return `    // 一條線/一個方格
-    OLED.drawLine(
-    ${line.x1},
-    ${line.y1},
-    ${line.x2},
-    ${line.y2}
-    )`;
-            });
-            return code + codeBlocks.join('\n') + '\n}';
-        }
-
-
-        /**
-         * 關閉並重設 Modal 狀態
-         */
-        function closeModal() {
-            codeModal.classList.remove('visible');
-        }
-
-        /**
-         * 移動圖案
-         */
-        function movePattern(dx, dy) {
-            const currentState = cells.map(cell => cell.classList.contains('white'));
-            const bgColorIsWhite = document.querySelector('input[name="move-bg"][value="white"]').checked;
-            const newState = [];
-
-            for (let y = 0; y < GRID_HEIGHT; y++) {
-                for (let x = 0; x < GRID_WIDTH; x++) {
-                    const sourceX = x - dx;
-                    const sourceY = y - dy;
-
-                    if (sourceX >= 0 && sourceX < GRID_WIDTH && sourceY >= 0 && sourceY < GRID_HEIGHT) {
-                        const sourceIndex = sourceY * GRID_WIDTH + sourceX;
-                        newState.push(currentState[sourceIndex]);
-                    } else {
-                        newState.push(bgColorIsWhite);
-                    }
-                }
-            }
-
-            newState.forEach((isWhite, index) => {
-                cells[index].classList.toggle('white', isWhite);
-            });
-            updateLiveCode();
-        }
-        
-        /**
-         * 縮放圖案
-         */
-        function scalePattern(scaleFactor) {
-            const whiteCellCoords = [];
-            cells.forEach((cell, index) => {
-                if (cell.classList.contains('white')) {
-                    whiteCellCoords.push({
-                        x: index % GRID_WIDTH,
-                        y: Math.floor(index / GRID_WIDTH)
-                    });
-                }
-            });
-
-            if (whiteCellCoords.length === 0) return;
-
-            const sum = whiteCellCoords.reduce((acc, pos) => ({ x: acc.x + pos.x, y: acc.y + pos.y }), { x: 0, y: 0 });
-            const centerX = sum.x / whiteCellCoords.length;
-            const centerY = sum.y / whiteCellCoords.length;
-
-            const newWhiteIndices = new Set();
-            whiteCellCoords.forEach(pos => {
-                const dx = pos.x - centerX;
-                const dy = pos.y - centerY;
-
-                const newX = Math.round(centerX + dx * scaleFactor);
-                const newY = Math.round(centerY + dy * scaleFactor);
-                
-                if (newX >= 0 && newX < GRID_WIDTH && newY >= 0 && newY < GRID_HEIGHT) {
-                    newWhiteIndices.add(newY * GRID_WIDTH + newX);
-                }
-            });
-
-            cells.forEach(cell => cell.classList.remove('white'));
-            newWhiteIndices.forEach(index => {
-                cells[index].classList.add('white');
-            });
-            updateLiveCode();
-        }
-
-
-        // --- 事件監聽 ---
-        gridContainer.addEventListener('mousedown', (event) => {
-            isMouseDown = true;
-            drawOnGrid(event);
-            event.preventDefault();
-        });
-        gridContainer.addEventListener('mouseover', (event) => {
-            if (isMouseDown) {
-                drawOnGrid(event);
-            }
-        });
-        document.addEventListener('mouseup', () => { isMouseDown = false; });
-        gridContainer.addEventListener('contextmenu', e => e.preventDefault());
-        
-        resetButton.addEventListener('click', () => {
-            cells.forEach(cell => cell.classList.remove('white'));
-            updateLiveCode();
-        });
-
-        invertColorsButton.addEventListener('click', () => {
-            cells.forEach(cell => cell.classList.toggle('white'));
-            updateLiveCode();
-        });
-
-        transformButton.addEventListener('click', () => generateOLEDCode(true));
-        
-        loadFromCodeButton.addEventListener('click', () => {
-            openModalWithCode('');
-            editButton.click();
-        });
-
-        // Movement listeners
-        moveRightButton.addEventListener('click', () => movePattern(1, 0));
-        moveLeftButton.addEventListener('click', () => movePattern(-1, 0));
-        moveDownButton.addEventListener('click', () => movePattern(0, 1));
-        moveUpButton.addEventListener('click', () => movePattern(0, -1));
-
-        // Zoom listeners
-        zoomInButton.addEventListener('click', () => scalePattern(1.1));
-        zoomOutButton.addEventListener('click', () => scalePattern(0.9));
-        
-        // --- Modal 相關事件監聽 ---
         modalCloseButton.addEventListener('click', closeModal);
         codeModal.addEventListener('click', (event) => {
-            if (event.target === codeModal) {
-                 closeModal();
-            }
+            if (event.target === codeModal) closeModal();
         });
 
         editButton.addEventListener('click', () => {
@@ -705,7 +974,7 @@
                 copyButton.textContent = '已複製！';
                 copyButton.disabled = true;
                 setTimeout(() => {
-                    copyButton.textContent = originalText;
+                    copyButton.textContent = "複製代碼";
                     copyButton.disabled = false;
                 }, 2000);
             } catch (err) {
@@ -715,27 +984,21 @@
             document.body.removeChild(tempTextArea);
         });
         
-        /**
-         * 在畫布上繪製一條線 (Bresenham's algorithm)
-         */
-        function drawLineOnGrid(x1, y1_code, x2, y2_code) {
-            // Transform code's y-coord (bottom-left 0,0) to grid's y-coord (top-left 0,0)
-            let y1 = GRID_HEIGHT - 1 - y1_code;
-            let y2 = GRID_HEIGHT - 1 - y2_code;
-            let x_start = x1; // temp var for loop
-
-            let dx = Math.abs(x2 - x_start), sx = x_start < x2 ? 1 : -1;
-            let dy = -Math.abs(y2 - y1), sy = y1 < y2 ? 1 : -1;
+        function drawLineOnGrid(x1, y1, x2, y2) {
+            let currentX = x1;
+            let currentY = y1;
+            const dx = Math.abs(x2 - currentX), sx = currentX < x2 ? 1 : -1;
+            const dy = -Math.abs(y2 - currentY), sy = currentY < y2 ? 1 : -1;
             let err = dx + dy, e2;
 
             while (true) {
-                if (x_start >= 0 && x_start < GRID_WIDTH && y1 >= 0 && y1 < GRID_HEIGHT) {
-                    cells[Math.round(y1) * GRID_WIDTH + Math.round(x_start)].classList.add('white');
+                if (currentX >= 0 && currentX < GRID_WIDTH && currentY >= 0 && currentY < GRID_HEIGHT) {
+                    cells[Math.round(currentY) * GRID_WIDTH + Math.round(currentX)].classList.add('white');
                 }
-                if (x_start === x2 && y1 === y2) break;
+                if (currentX === x2 && currentY === y2) break;
                 e2 = 2 * err;
-                if (e2 >= dy) { err += dy; x_start += sx; }
-                if (e2 <= dx) { err += dx; y1 += sy; }
+                if (e2 >= dy) { err += dy; currentX += sx; }
+                if (e2 <= dx) { err += dx; currentY += sy; }
             }
         }
 
@@ -776,23 +1039,15 @@
                                 const numMatch = part.match(/-?\d+/);
                                 return numMatch ? parseInt(numMatch[0], 10) : 0;
                             });
-                            if (points.length >= 4) {
-                                OLED_mock.drawLine(points[0], points[1], points[2], points[3]);
-                            } else {
-                                OLED_mock.drawLine(points[0], points[1], points[0], points[1]);
-                            }
+                            if (points.length >= 4) OLED_mock.drawLine(points[0], points[1], points[2], points[3]);
+                            else OLED_mock.drawLine(points[0], points[1], points[0], points[1]);
                         }
                     }
-                }
-                
-                if (drawCommands.length === 0 && code.trim().length > 0) {
-                     console.warn("載入完成，但未找到任何有效的繪圖指令。");
                 }
                 
                 drawCommands.forEach(cmd => {
                     drawLineOnGrid(Math.round(cmd.x1), Math.round(cmd.y1), Math.round(cmd.x2), Math.round(cmd.y2));
                 });
-
             } catch (e) {
                 console.error("執行載入的程式碼時發生錯誤:", e);
                 modalTitle.textContent = '程式碼執行錯誤！';
@@ -805,18 +1060,16 @@
             }
             
             closeModal();
-            updateLiveCode();
+            saveState();
         });
 
         formatButton.addEventListener('click', () => {
             const code = codeEditor.value;
             const nameMatch = code.match(/function\s*([^\s(]+)/);
             const functionName = nameMatch ? nameMatch[1] : '_pattern';
-
             const paramsMatch = code.match(/function[^{]+\(([^)]*)\)/);
             let params = paramsMatch ? paramsMatch[1].trim() : '';
             params = params.replace(/:[^,)]+/g, '').replace(/\s+/g, ' ').trim();
-
             const drawCalls = code.match(/OLED\.drawLine\s*\(([\s\S]*?)\)/g) || [];
 
             let formattedCode = `function ${functionName} (${params}) {\n`;
@@ -847,9 +1100,6 @@
             codeEditor.value = formattedCode;
         });
 
-        // --- 程式初始化 ---
-        createGrid();
-        updateLiveCode();
     </script>
 
 </body>
